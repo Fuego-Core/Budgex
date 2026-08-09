@@ -111,6 +111,10 @@ const App = (() => {
     const late = Store.lateCount();
     const backup = Store.backupStatus();
 
+    // Première utilisation (app vierge) : on accueille et on oriente.
+    const firstRun =
+      s.settings.income === 0 && s.charges.length === 0 && s.credits.length === 0;
+
     // Aperçu des crédits.
     const creditsHtml = s.credits
       .map((c) => {
@@ -134,6 +138,17 @@ const App = (() => {
           <button class="icon-btn" data-nav="reglages" aria-label="Réglages" title="Réglages">${icon('gear')}</button>
         </div>
       </header>
+
+      <!-- Première utilisation : bienvenue et premiers pas -->
+      ${firstRun
+        ? `<div class="alert welcome">
+             <span>Bienvenue sur Oboli 👋 Commence par indiquer ton revenu, puis ajoute tes factures.</span>
+             <span class="alert-actions">
+               <button class="link" data-nav="reglages">Réglages</button>
+               <button class="link" data-nav="factures">Factures</button>
+             </span>
+           </div>`
+        : ''}
 
       <!-- Rappels : en retard (corail) puis sauvegarde (ambre) -->
       ${late > 0
@@ -195,7 +210,9 @@ const App = (() => {
         </div>
         ${upcoming.length
           ? `<ul class="list compact">${upcoming.map(homeChargeRow).join('')}</ul>`
-          : `<p class="empty">Tout est payé — aucune échéance en attente ce mois-ci.</p>`}
+          : s.charges.length === 0
+            ? `<p class="empty">Aucune facture enregistrée pour l’instant.</p>`
+            : `<p class="empty">Tout est payé — aucune échéance en attente ce mois-ci.</p>`}
       </section>
 
       <!-- Aperçu des crédits -->
@@ -253,7 +270,9 @@ const App = (() => {
         <div><p class="eyebrow">Payé</p><p class="figure-xs mint">${UI.money(paid)}</p></div>
         <div><p class="eyebrow">Reste</p><p class="figure-xs ${reste > 0 ? 'amber' : ''}">${UI.money(reste)}</p></div>
       </section>
-      <ul class="list">${rows}</ul>
+      ${charges.length
+        ? `<ul class="list">${rows}</ul>`
+        : `<p class="empty card">Aucune facture pour l’instant. Ajoute ta première avec le bouton « + Ajouter » en haut.</p>`}
     `;
   }
 
@@ -463,7 +482,7 @@ const App = (() => {
 
       <section class="card danger-zone">
         <h2>Repartir de zéro</h2>
-        <p class="subtle">Efface tout et revient aux données de départ. Sans retour en arrière.</p>
+        <p class="subtle">Efface tout et repart d’une app vierge. Sans retour en arrière.</p>
         <button class="btn danger" data-action="reset">Tout effacer</button>
       </section>
     `;
@@ -767,7 +786,7 @@ const App = (() => {
       case 'reset':
         confirmSheet(
           'Repartir de zéro',
-          'Tout sera effacé et remplacé par les données de départ. Cette action est définitive.',
+          'Tout sera effacé et l’app repartira vierge. Cette action est définitive.',
           'Tout effacer',
           () => { Store.resetAll(); UI.toast('Données réinitialisées.'); show('accueil'); }
         );

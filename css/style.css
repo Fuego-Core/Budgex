@@ -304,6 +304,12 @@ body.subview #app { padding-bottom: calc(var(--safe-bottom) + 24px); }
   flex-wrap: wrap;
 }
 .alert.backup span:first-child { flex: 1; min-width: 60%; color: var(--text); }
+.alert.welcome {
+  background: rgba(94, 224, 176, 0.12);
+  color: var(--text);
+  flex-wrap: wrap;
+}
+.alert.welcome span:first-child { flex: 1; min-width: 60%; }
 .alert-actions { display: flex; gap: 10px; }
 .link.muted { color: var(--muted); }
 

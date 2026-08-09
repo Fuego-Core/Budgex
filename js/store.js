@@ -47,35 +47,17 @@ const Store = (() => {
    * Données de départ
    * ------------------------------------------------------------------ */
 
-  // Construit un état neuf avec les charges et crédits d'exemple.
+  // Construit un état neuf et VIDE : chacun renseigne son propre budget.
+  // (L'app démarre sans factures ni crédits ; l'accueil guide les premiers pas.)
   function seed() {
     const now = monthKey();
-
-    const charges = [
-      { name: 'Loyer', amount: 450, dueDay: 5 },
-      { name: 'Énergie', amount: 100, dueDay: 10 },
-      { name: 'Téléphone / internet', amount: 180, dueDay: 12 },
-      { name: 'Crèche', amount: 240, dueDay: 5 },
-      { name: 'Crédit voiture', amount: 330, dueDay: 15 },
-      { name: 'Crédit consommation', amount: 150, dueDay: 15 },
-      { name: 'Assurance voiture', amount: 126, dueDay: 20 },
-      { name: 'Assurance habitation', amount: 45, dueDay: 20 },
-      { name: 'Syndicat', amount: 25, dueDay: 25 },
-      { name: 'Salle de sport', amount: 35, dueDay: 28 },
-    ].map((c) => ({ id: uid(), ...c }));
-
-    const credits = [
-      { name: 'Crédit consommation', remaining: 2500, initial: 2500, monthly: 150, lastApplied: now },
-      { name: 'Crédit voiture', remaining: 17780, initial: 17780, monthly: 330, lastApplied: now },
-    ].map((c) => ({ id: uid(), ...c }));
-
     return {
       version: 1,
-      settings: { income: 2500, savingsGoal: 150, outingBudget: 200 },
-      charges,
-      credits,
+      settings: { income: 0, savingsGoal: 0, outingBudget: 0 },
+      charges: [],
+      credits: [],
       months: {
-        [now]: { paid: {}, savings: [], outings: [], envelope: 200 },
+        [now]: { paid: {}, savings: [], outings: [], envelope: 0 },
       },
       lastOpened: now,
       // Métadonnées : suivi des sauvegardes pour le filet de sécurité des données.
