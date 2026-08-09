@@ -45,7 +45,9 @@ const UI = (() => {
    * ------------------------------------------------------------------ */
 
   let toastTimer = null;
-  function toast(message) {
+  // toast(message) simple, ou toast(message, { actionLabel, onAction }) avec
+  // un bouton (ex. « Annuler »). Le toast reste plus longtemps s'il a une action.
+  function toast(message, opts = {}) {
     let el = document.getElementById('toast');
     if (!el) {
       el = document.createElement('div');
@@ -55,10 +57,29 @@ const UI = (() => {
       el.setAttribute('aria-live', 'polite');
       document.body.appendChild(el);
     }
-    el.textContent = message;
+    el.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = message;
+    el.appendChild(span);
+
+    if (opts.actionLabel && typeof opts.onAction === 'function') {
+      const btn = document.createElement('button');
+      btn.className = 'toast-action';
+      btn.textContent = opts.actionLabel;
+      btn.addEventListener('click', () => {
+        clearTimeout(toastTimer);
+        el.classList.remove('show');
+        opts.onAction();
+      });
+      el.appendChild(btn);
+    }
+
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    toastTimer = setTimeout(
+      () => el.classList.remove('show'),
+      opts.actionLabel ? 5000 : 2200
+    );
   }
 
   /* ------------------------------------------------------------------ *

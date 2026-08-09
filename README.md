@@ -22,6 +22,26 @@ d'accueil de ton téléphone et l'utiliser comme une vraie application, hors lig
 - **Historique** — un récapitulatif de chaque mois écoulé.
 - **Réglages** — revenu, objectifs, export/import de sauvegarde.
 
+### Petites attentions
+
+- **Mode clair / sombre** automatique : l'app suit le thème de ton téléphone.
+- **Rappel de sauvegarde** : un bandeau discret t'invite à exporter tes données
+  si tu n'as pas fait de sauvegarde depuis un moment (données à risque, voir
+  plus bas).
+- **Pastille d'échéances** : sur les téléphones compatibles, l'icône installée
+  affiche le nombre de factures en retard (API *Badging*, mise à jour à
+  l'ouverture de l'app).
+- **Annuler une suppression** : un bouton « Annuler » apparaît quand tu
+  supprimes un versement ou une sortie.
+- **Mise à jour propre** : quand une nouvelle version est déployée, un bandeau
+  « Nouvelle version disponible » te propose de recharger.
+
+> **Et les notifications ?** Une app 100 % locale et sans serveur ne peut pas
+> envoyer de vraies notifications programmées (ça demanderait un serveur de
+> *push*, ce qui irait contre le principe « aucune donnée ne sort du
+> téléphone »). À la place : la **pastille** sur l'icône et le **rappel à
+> l'ouverture** des factures en retard.
+
 Aucune dépendance externe, aucun framework, aucun CDN pour la logique : juste du
 HTML, du CSS et du JavaScript. Les polices sont chargées depuis Google Fonts avec
 une pile de repli système, donc l'app reste lisible même hors connexion.

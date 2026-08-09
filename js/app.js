@@ -55,6 +55,20 @@ const App = (() => {
       case 'historique': renderHistorique(); break;
       case 'reglages': renderReglages(); break;
     }
+    updateBadge();
+  }
+
+  // Pastille sur l'icône de l'app (nombre de factures en retard).
+  // Ne fonctionne que sur les PWA installées qui supportent l'API Badging.
+  function updateBadge() {
+    if (!('setAppBadge' in navigator)) return;
+    try {
+      const late = Store.lateCount();
+      if (late > 0) navigator.setAppBadge(late);
+      else if ('clearAppBadge' in navigator) navigator.clearAppBadge();
+    } catch (e) {
+      /* silencieux : l'API peut échouer selon la plateforme */
+    }
   }
 
   // Rafraîchit tout (utile après une action qui touche plusieurs vues).
@@ -93,6 +107,10 @@ const App = (() => {
     // Prochaines échéances : 4 factures non payées, triées par jour.
     const upcoming = Store.chargesSorted().filter((c) => !c.paid).slice(0, 4);
 
+    // Rappels : factures en retard + filet de sécurité des données.
+    const late = Store.lateCount();
+    const backup = Store.backupStatus();
+
     // Aperçu des crédits.
     const creditsHtml = s.credits
       .map((c) => {
@@ -116,6 +134,25 @@ const App = (() => {
           <button class="icon-btn" data-nav="reglages" aria-label="Réglages" title="Réglages">${icon('gear')}</button>
         </div>
       </header>
+
+      <!-- Rappels : en retard (corail) puis sauvegarde (ambre) -->
+      ${late > 0
+        ? `<button class="alert late" data-nav="factures">
+             <span>${late} facture${late > 1 ? 's' : ''} en retard</span>
+             <span class="alert-cta">Voir →</span>
+           </button>`
+        : ''}
+      ${backup.needed
+        ? `<div class="alert backup">
+             <span>${backup.days == null
+               ? 'Pense à sauvegarder tes données.'
+               : `Dernière sauvegarde il y a ${backup.days} jours.`}</span>
+             <span class="alert-actions">
+               <button class="link" data-action="do-backup">Exporter</button>
+               <button class="link muted" data-action="snooze-backup">Plus tard</button>
+             </span>
+           </div>`
+        : ''}
 
       <!-- Le ruban du mois : la première chose à regarder -->
       <section class="card ribbon-card">
@@ -611,6 +648,7 @@ const App = (() => {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    Store.markExported(); // met à jour le filet de sécurité des données
     UI.toast('Export téléchargé.');
   }
 
@@ -663,14 +701,32 @@ const App = (() => {
       }
 
       case 'add-saving': savingSheet(); break;
-      case 'del-saving':
-        Store.removeSaving(id); UI.toast('Versement supprimé.'); refresh();
+      case 'del-saving': {
+        const list = Store.currentMonth().savings;
+        const idx = list.findIndex((x) => x.id === id);
+        const item = list[idx];
+        Store.removeSaving(id);
+        refresh();
+        UI.toast('Versement supprimé.', {
+          actionLabel: 'Annuler',
+          onAction: () => { Store.restoreSaving(item, idx); refresh(); UI.toast('Versement restauré.'); },
+        });
         break;
+      }
 
       case 'add-outing': outingSheet(); break;
-      case 'del-outing':
-        Store.removeOuting(id); UI.toast('Sortie supprimée.'); refresh();
+      case 'del-outing': {
+        const list = Store.currentMonth().outings;
+        const idx = list.findIndex((x) => x.id === id);
+        const item = list[idx];
+        Store.removeOuting(id);
+        refresh();
+        UI.toast('Sortie supprimée.', {
+          actionLabel: 'Annuler',
+          onAction: () => { Store.restoreOuting(item, idx); refresh(); UI.toast('Sortie restaurée.'); },
+        });
         break;
+      }
 
       case 'add-credit': creditEditSheet(); break;
       case 'credit-pay': creditPaySheet(s.credits.find((c) => c.id === id)); break;
@@ -694,6 +750,11 @@ const App = (() => {
 
       case 'export': doExport(); break;
       case 'import': $('import-file').click(); break;
+
+      case 'do-backup': doExport(); refresh(); break;
+      case 'snooze-backup':
+        Store.snoozeBackup(); refresh(); UI.toast('Rappel repoussé d’une semaine.');
+        break;
 
       case 'reset':
         confirmSheet(
@@ -733,6 +794,23 @@ const App = (() => {
 
   function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  // Bandeau « nouvelle version disponible » quand le service worker se met à jour.
+  function showUpdateBanner(registration) {
+    if (document.getElementById('update-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'update-banner';
+    b.className = 'update-banner';
+    b.innerHTML = `
+      <span>Nouvelle version disponible.</span>
+      <button class="btn small" id="do-update">Recharger</button>`;
+    document.body.appendChild(b);
+    requestAnimationFrame(() => b.classList.add('show'));
+    document.getElementById('do-update').addEventListener('click', () => {
+      // On demande au nouveau worker en attente de prendre la main.
+      if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    });
   }
 
   // Nombre de mois → « 1 an et 2 mois » si ≥ 12, sinon « 8 mois ».
@@ -777,11 +855,34 @@ const App = (() => {
       }
     });
 
-    // Enregistrement du service worker pour le hors-ligne.
+    // On demande un stockage « persistant » : le navigateur évite alors
+    // d'effacer nos données pour faire de la place. Filet de sécurité.
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().catch(() => {});
+    }
+
+    // Enregistrement du service worker + détection des mises à jour.
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch((err) => {
-          console.warn('Service worker non enregistré :', err);
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+          // Une nouvelle version s'installe : on propose de recharger.
+          reg.addEventListener('updatefound', () => {
+            const nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', () => {
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                showUpdateBanner(reg);
+              }
+            });
+          });
+        }).catch((err) => console.warn('Service worker non enregistré :', err));
+
+        // Quand le nouveau worker prend la main, on recharge une seule fois.
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (reloaded) return;
+          reloaded = true;
+          window.location.reload();
         });
       });
     }

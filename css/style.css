@@ -280,6 +280,57 @@ body.subview #app { padding-bottom: calc(var(--safe-bottom) + 24px); }
 .badge.ok { background: rgba(94, 224, 176, 0.18); color: var(--mint); }
 
 /* ------------------------------------------------------------------ *
+ * Bandeaux de rappel (accueil) : en retard, sauvegarde
+ * ------------------------------------------------------------------ */
+.alert {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  font-size: 0.9rem; font-weight: 500;
+  border: none;
+}
+.alert.late {
+  background: rgba(255, 122, 107, 0.14);
+  color: var(--coral);
+}
+.alert.late .alert-cta { font-weight: 600; white-space: nowrap; }
+.alert.backup {
+  background: rgba(245, 185, 68, 0.12);
+  color: var(--amber);
+  flex-wrap: wrap;
+}
+.alert.backup span:first-child { flex: 1; min-width: 60%; color: var(--text); }
+.alert-actions { display: flex; gap: 10px; }
+.link.muted { color: var(--muted); }
+
+/* ------------------------------------------------------------------ *
+ * Bandeau « nouvelle version disponible »
+ * ------------------------------------------------------------------ */
+.update-banner {
+  position: fixed;
+  left: 12px; right: 12px;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 12px);
+  max-width: 536px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 12px 12px 12px 18px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  z-index: 150;
+  transform: translateY(20px); opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  font-size: 0.92rem; font-weight: 500;
+}
+.update-banner.show { transform: translateY(0); opacity: 1; }
+.update-banner .btn.small { flex: none; }
+
+/* ------------------------------------------------------------------ *
  * Écrans vides
  * ------------------------------------------------------------------ */
 .empty {
@@ -459,8 +510,14 @@ p.empty.card { padding: 28px 16px; }
   z-index: 200;
   transition: opacity 0.2s ease, transform 0.2s ease;
   max-width: 90vw; text-align: center;
+  display: inline-flex; align-items: center; gap: 14px;
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast-action {
+  background: none; border: none;
+  color: var(--mint); font-weight: 600; font-size: 0.9rem;
+  padding: 2px 4px; flex: none;
+}
 
 /* ------------------------------------------------------------------ *
  * Accessibilité — focus clavier visible
@@ -469,6 +526,33 @@ p.empty.card { padding: 28px 16px; }
   outline: 2px solid var(--mint);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Mode clair — suit le réglage du téléphone.
+ * On ne redéfinit que les couleurs ; tailles et rayons sont inchangés.
+ * Les accents sont choisis pour rester lisibles sur fond clair.
+ * ------------------------------------------------------------------ */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #EEF1F7;
+    --surface: #FFFFFF;
+    --surface-2: #EDF1F8;
+    --line: #E0E6F0;
+
+    --text: #1A2336;
+    --muted: #66728A;
+
+    --mint: #0B926B;         /* argent gardé, actions positives */
+    --amber: #A9741A;        /* attention, à payer */
+    --amber-dim: #F5E6C7;    /* fond du motif hachuré */
+    --coral: #D8442E;        /* dépassement, suppression */
+    --free: #D6DDE9;         /* segment « libre » du ruban */
+  }
+  /* Barre d'onglets translucide claire */
+  .tabbar { background: rgba(255, 255, 255, 0.88); }
+  /* Le vert vif du bouton primaire garde un texte foncé lisible */
+  .btn { color: #04231A; }
 }
 
 /* ------------------------------------------------------------------ *

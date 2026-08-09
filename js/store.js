@@ -78,7 +78,14 @@ const Store = (() => {
         [now]: { paid: {}, savings: [], outings: [], envelope: 200 },
       },
       lastOpened: now,
+      // Métadonnées : suivi des sauvegardes pour le filet de sécurité des données.
+      meta: { lastExport: null, backupSnooze: null },
     };
+  }
+
+  // Garantit la présence du bloc `meta` (pour les anciens états importés).
+  function ensureMeta() {
+    if (!state.meta) state.meta = { lastExport: null, backupSnooze: null };
   }
 
   /* ------------------------------------------------------------------ *
@@ -116,6 +123,7 @@ const Store = (() => {
       }
     }
 
+    ensureMeta();
     rollover(); // met l'état à jour selon le mois courant
     return state;
   }
@@ -232,6 +240,11 @@ const Store = (() => {
       }));
   }
 
+  // Nombre de factures en retard (échéance passée, non payées) ce mois-ci.
+  function lateCount() {
+    return chargesSorted().filter((c) => c.late).length;
+  }
+
   /* ------------------------------------------------------------------ *
    * Calculs — épargne
    * ------------------------------------------------------------------ */
@@ -346,6 +359,14 @@ const Store = (() => {
     save();
   }
 
+  // Réinsère un versement supprimé à sa position d'origine (pour « Annuler »).
+  function restoreSaving(item, index) {
+    const m = currentMonth();
+    const i = Math.max(0, Math.min(index, m.savings.length));
+    m.savings.splice(i, 0, item);
+    save();
+  }
+
   /* ------------------------------------------------------------------ *
    * Mutations — sorties
    * ------------------------------------------------------------------ */
@@ -363,6 +384,14 @@ const Store = (() => {
   function removeOuting(id) {
     const m = currentMonth();
     m.outings = m.outings.filter((o) => o.id !== id);
+    save();
+  }
+
+  // Réinsère une sortie supprimée à sa position d'origine (pour « Annuler »).
+  function restoreOuting(item, index) {
+    const m = currentMonth();
+    const i = Math.max(0, Math.min(index, m.outings.length));
+    m.outings.splice(i, 0, item);
     save();
   }
 
@@ -420,6 +449,50 @@ const Store = (() => {
     return JSON.stringify(state, null, 2);
   }
 
+  // À appeler juste après un export réussi : mémorise la date.
+  function markExported() {
+    ensureMeta();
+    state.meta.lastExport = new Date().toISOString();
+    state.meta.backupSnooze = null; // on repart d'une ardoise propre
+    save();
+  }
+
+  // Repousse le rappel de sauvegarde d'une semaine.
+  function snoozeBackup() {
+    ensureMeta();
+    const in7days = new Date();
+    in7days.setDate(in7days.getDate() + 7);
+    state.meta.backupSnooze = in7days.toISOString();
+    save();
+  }
+
+  // Vrai s'il existe des données qui valent la peine d'être sauvegardées.
+  function hasMeaningfulData() {
+    const months = Object.values(state.months);
+    if (Object.keys(state.months).length > 1) return true;
+    return months.some(
+      (m) => m.savings.length || m.outings.length || Object.keys(m.paid).length
+    );
+  }
+
+  // Statut du filet de sécurité : faut-il rappeler d'exporter ?
+  // Retourne { needed, days } où `days` = jours depuis le dernier export (ou null).
+  function backupStatus() {
+    ensureMeta();
+    const now = new Date();
+
+    // Rappel mis en veille ?
+    if (state.meta.backupSnooze && now < new Date(state.meta.backupSnooze)) {
+      return { needed: false, days: null };
+    }
+    if (!hasMeaningfulData()) return { needed: false, days: null };
+
+    if (!state.meta.lastExport) return { needed: true, days: null };
+
+    const days = Math.floor((now - new Date(state.meta.lastExport)) / 86400000);
+    return { needed: days >= 30, days };
+  }
+
   // Importe un JSON (chaîne). Valide la structure ; lève une erreur claire sinon.
   function importJSON(text) {
     let data;
@@ -440,6 +513,7 @@ const Store = (() => {
       throw new Error('Fichier invalide : structure de budget non reconnue.');
     }
     state = data;
+    ensureMeta();
     rollover();
     save();
   }
@@ -469,6 +543,7 @@ const Store = (() => {
     unpaidTotal,
     disponible,
     chargesSorted,
+    lateCount,
     togglePaid,
     addCharge,
     updateCharge,
@@ -479,11 +554,13 @@ const Store = (() => {
     savingsSeries,
     addSaving,
     removeSaving,
+    restoreSaving,
     // sorties
     outingsMonth,
     outingsRemaining,
     addOuting,
     removeOuting,
+    restoreOuting,
     // crédits
     creditsRemainingTotal,
     creditsMonthlyTotal,
@@ -495,6 +572,9 @@ const Store = (() => {
     updateSettings,
     exportJSON,
     importJSON,
+    markExported,
+    snoozeBackup,
+    backupStatus,
   };
 })();
 
