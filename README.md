@@ -33,8 +33,10 @@ d'accueil de ton téléphone et l'utiliser comme une vraie application, hors lig
   l'ouverture de l'app).
 - **Annuler une suppression** : un bouton « Annuler » apparaît quand tu
   supprimes un versement ou une sortie.
-- **Mise à jour propre** : quand une nouvelle version est déployée, un bandeau
-  « Nouvelle version disponible » te propose de recharger.
+- **Mise à jour automatique** : quand une nouvelle version est déployée, le
+  service worker l'active tout seul et l'app se recharge une fois pour servir
+  les fichiers à jour (pense quand même à incrémenter la version du cache dans
+  `sw.js` à chaque changement).
 
 > **Et les notifications ?** Une app 100 % locale et sans serveur ne peut pas
 > envoyer de vraies notifications programmées (ça demanderait un serveur de

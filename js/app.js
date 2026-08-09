@@ -823,22 +823,6 @@ const App = (() => {
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
-  // Bandeau « nouvelle version disponible » quand le service worker se met à jour.
-  function showUpdateBanner(registration) {
-    if (document.getElementById('update-banner')) return;
-    const b = document.createElement('div');
-    b.id = 'update-banner';
-    b.className = 'update-banner';
-    b.innerHTML = `
-      <span>Nouvelle version disponible.</span>
-      <button class="btn small" id="do-update">Recharger</button>`;
-    document.body.appendChild(b);
-    requestAnimationFrame(() => b.classList.add('show'));
-    document.getElementById('do-update').addEventListener('click', () => {
-      // On demande au nouveau worker en attente de prendre la main.
-      if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-    });
-  }
 
   // Nombre de mois → « 1 an et 2 mois » si ≥ 12, sinon « 8 mois ».
   function formatMonths(n) {
@@ -888,29 +872,24 @@ const App = (() => {
       navigator.storage.persist().catch(() => {});
     }
 
-    // Enregistrement du service worker + détection des mises à jour.
+    // Enregistrement du service worker avec mise à jour automatique.
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then((reg) => {
-          // Une nouvelle version s'installe : on propose de recharger.
-          reg.addEventListener('updatefound', () => {
-            const nw = reg.installing;
-            if (!nw) return;
-            nw.addEventListener('statechange', () => {
-              if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                showUpdateBanner(reg);
-              }
-            });
-          });
-        }).catch((err) => console.warn('Service worker non enregistré :', err));
+        navigator.serviceWorker.register('sw.js').catch((err) =>
+          console.warn('Service worker non enregistré :', err));
 
-        // Quand le nouveau worker prend la main, on recharge une seule fois.
-        let reloaded = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (reloaded) return;
-          reloaded = true;
-          window.location.reload();
-        });
+        // Si l'app était déjà contrôlée par un worker, un changement de
+        // contrôleur = une nouvelle version vient de s'activer → on recharge
+        // une seule fois pour servir les fichiers à jour. (Pas de rechargement
+        // au tout premier lancement, où il n'y a pas encore de contrôleur.)
+        if (navigator.serviceWorker.controller) {
+          let reloaded = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (reloaded) return;
+            reloaded = true;
+            window.location.reload();
+          });
+        }
       });
     }
 

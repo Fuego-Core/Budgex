@@ -3,11 +3,11 @@
  * Met en cache tous les fichiers de l'app pour un fonctionnement hors connexion.
  *
  * IMPORTANT : à chaque mise à jour de l'app, incrémente le numéro de version
- * ci-dessous (CACHE → 'oboli-v4', 'oboli-v5'…). Sans ça, le téléphone
+ * ci-dessous (CACHE → 'oboli-v5', 'oboli-v6'…). Sans ça, le téléphone
  * continue de servir l'ancienne version depuis le cache.
  */
 
-const CACHE = 'oboli-v3';
+const CACHE = 'oboli-v4';
 
 // Tous les fichiers nécessaires pour tourner sans réseau.
 // Chemins relatifs pour fonctionner aussi sous un sous-dossier (GitHub Pages).
@@ -24,18 +24,13 @@ const ASSETS = [
   './icons/icon-maskable-512.png',
 ];
 
-// Installation : on pré-remplit le cache.
-// On NE force PAS l'activation : le nouveau worker attend, et l'app propose
-// à l'utilisateur de recharger (bandeau « Nouvelle version disponible »).
+// Installation : on pré-remplit le cache et on active la nouvelle version
+// immédiatement (mise à jour automatique, sans intervention).
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
   );
-});
-
-// L'app peut demander au worker en attente de prendre la main tout de suite.
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  self.skipWaiting();
 });
 
 // Activation : on supprime les anciens caches (versions précédentes).
