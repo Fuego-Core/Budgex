@@ -11,7 +11,7 @@
 const App = (() => {
   // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
   // tourne bien sur la dernière version, et pas sur un cache périmé).
-  const APP_VERSION = '19';
+  const APP_VERSION = '20';
 
   // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
@@ -100,6 +100,7 @@ const App = (() => {
 
     const active = document.querySelector('.view.active');
     if (!active) return;
+    enhanceSwipeRows(active); // rend les lignes supprimables balayables
     if (enter) {
       // Si une transition de vue est en cours, elle fait l'entrée : on ne double
       // pas avec la cascade CSS ni les compteurs (les montants finaux s'affichent).
@@ -159,6 +160,74 @@ const App = (() => {
   }
 
   const $ = (id) => document.getElementById(id);
+
+  /* ------------------------------------------------------------------ *
+   * Geste : balayer une ligne vers la gauche pour la supprimer
+   * ------------------------------------------------------------------ */
+
+  // Emballe le contenu des lignes supprimables pour révéler un fond « Supprimer »
+  // quand on les fait glisser. Idempotent, rejoué à chaque rendu.
+  function enhanceSwipeRows(scope) {
+    if (prefersReducedMotion()) return; // mode calme : pas de balayage
+    scope.querySelectorAll('.list .row').forEach((row) => {
+      if (row.querySelector('.row-content')) return;         // déjà emballée
+      if (!row.querySelector('.trash[data-action]')) return; // seulement les supprimables
+      const content = document.createElement('div');
+      content.className = 'row-content';
+      while (row.firstChild) content.appendChild(row.firstChild);
+      const behind = document.createElement('div');
+      behind.className = 'row-behind';
+      behind.textContent = 'Supprimer';
+      row.appendChild(behind);
+      row.appendChild(content);
+    });
+  }
+
+  let swipe = null;
+  function onSwipeDown(e) {
+    const content = e.target.closest && e.target.closest('.row-content');
+    if (!content) return;
+    const row = content.closest('.row');
+    swipe = {
+      content, row, behind: row.querySelector('.row-behind'),
+      x0: e.clientX, y0: e.clientY, dx: 0, mode: null,
+    };
+  }
+  function onSwipeMove(e) {
+    if (!swipe) return;
+    const dx = e.clientX - swipe.x0;
+    const dy = e.clientY - swipe.y0;
+    if (swipe.mode === null) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      // Direction dominante : horizontale = balayage, verticale = défilement.
+      swipe.mode = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'scroll';
+      if (swipe.mode === 'swipe') {
+        swipe.content.style.transition = 'none';
+        try { swipe.content.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+    }
+    if (swipe.mode !== 'swipe') return;
+    swipe.dx = Math.min(0, dx); // uniquement vers la gauche
+    swipe.content.style.transform = `translateX(${swipe.dx}px)`;
+    if (swipe.behind) swipe.behind.style.opacity = String(Math.min(1, -swipe.dx / 80));
+    if (e.cancelable) e.preventDefault();
+  }
+  function onSwipeEnd() {
+    if (!swipe) return;
+    const s = swipe;
+    swipe = null;
+    if (s.mode !== 'swipe') return;
+    s.content.style.transition = '';
+    s.content.style.transform = ''; // retombe en place
+    if (s.behind) s.behind.style.opacity = '';
+    const threshold = Math.min(120, s.row.offsetWidth * 0.35);
+    if (-s.dx > threshold) {
+      // Seuil franchi : on route vers le flux de suppression existant
+      // (confirmation pour factures/crédits, annulation pour épargne/sorties).
+      const trash = s.row.querySelector('.trash[data-action]');
+      if (trash) trash.click();
+    }
+  }
 
   /* ------------------------------------------------------------------ *
    * Écran d'ouverture (splash)
@@ -1169,6 +1238,12 @@ const App = (() => {
 
     // Un seul écouteur de clic pour toute l'app (délégation).
     document.body.addEventListener('click', onClick);
+
+    // Balayage-pour-supprimer sur les lignes (délégation).
+    document.body.addEventListener('pointerdown', onSwipeDown);
+    document.body.addEventListener('pointermove', onSwipeMove);
+    document.body.addEventListener('pointerup', onSwipeEnd);
+    document.body.addEventListener('pointercancel', onSwipeEnd);
 
     // Import de fichier — cas normal : l'événement 'change' se déclenche.
     document.body.addEventListener('change', (e) => {

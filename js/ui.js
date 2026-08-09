@@ -125,6 +125,41 @@ const UI = (() => {
     // Fermeture au clavier (Échap).
     document.addEventListener('keydown', escToClose);
 
+    // Geste : tirer la feuille vers le bas pour la fermer. Le glissement ne part
+    // que de la zone du haut (poignée + titre, ~72 px) pour ne pas gêner le
+    // défilement du contenu. La feuille suit le doigt et retombe sous le seuil.
+    let startY = 0, dy = 0, dragging = false;
+    sheet.addEventListener('pointerdown', (e) => {
+      const rect = sheet.getBoundingClientRect();
+      if (e.clientY - rect.top > 72) return; // seulement le haut de la feuille
+      dragging = true; startY = e.clientY; dy = 0;
+      sheet.style.transition = 'none';
+      try { sheet.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    sheet.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      dy = Math.max(0, e.clientY - startY);
+      sheet.style.transform = `translateY(${dy}px)`;
+      overlay.style.background = `rgba(6, 9, 16, ${0.6 * (1 - Math.min(1, dy / 320))})`;
+      if (dy > 4) e.preventDefault();
+    });
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      sheet.style.transition = ''; // rétablit la transition (ressort)
+      const threshold = Math.min(160, sheet.offsetHeight * 0.28);
+      if (dy > threshold) {
+        overlay.style.background = '';   // laisse le CSS gérer le fondu du fond
+        sheet.style.transform = '';      // la règle de base (translateY 100%) reprend
+        closeSheet();
+      } else {
+        sheet.style.transform = '';      // retombe en place (ressort)
+        overlay.style.background = '';
+      }
+    };
+    sheet.addEventListener('pointerup', endDrag);
+    sheet.addEventListener('pointercancel', endDrag);
+
     // Animation d'entrée au tour suivant, pour laisser le DOM se poser.
     requestAnimationFrame(() => overlay.classList.add('open'));
 
