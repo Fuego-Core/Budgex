@@ -1,5 +1,5 @@
 /*
- * style.css — Tout le style de Budgex.
+ * style.css — Tout le style d'Oboli.
  * Thème sombre par défaut, pensé pour la nuit : bleu d'encre, pas de noir pur.
  * Hiérarchie portée par la taille et le contraste, pas par les bordures.
  */
@@ -57,6 +57,19 @@ body {
 }
 
 body.no-scroll { overflow: hidden; }
+
+/* Halo menthe ambiant en haut de l'écran : donne de la profondeur, discret.
+   Fixe et non interactif, il ne provoque aucun débordement. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(130% 55% at 50% -12%, rgba(94, 224, 176, 0.10), transparent 62%),
+    radial-gradient(90% 40% at 100% 0%, rgba(245, 185, 68, 0.05), transparent 55%);
+}
 
 h1, h2 { font-family: var(--font-title); font-weight: 600; margin: 0; }
 h1 { font-size: 1.4rem; }

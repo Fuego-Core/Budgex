@@ -1,13 +1,13 @@
 /*
- * sw.js — Service worker de Budgex.
+ * sw.js — Service worker d'Oboli.
  * Met en cache tous les fichiers de l'app pour un fonctionnement hors connexion.
  *
  * IMPORTANT : à chaque mise à jour de l'app, incrémente le numéro de version
- * ci-dessous (CACHE → 'budgex-v2', 'budgex-v3'…). Sans ça, le téléphone
+ * ci-dessous (CACHE → 'oboli-v3', 'oboli-v4'…). Sans ça, le téléphone
  * continue de servir l'ancienne version depuis le cache.
  */
 
-const CACHE = 'budgex-v1';
+const CACHE = 'oboli-v2';
 
 // Tous les fichiers nécessaires pour tourner sans réseau.
 // Chemins relatifs pour fonctionner aussi sous un sous-dossier (GitHub Pages).

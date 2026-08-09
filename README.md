@@ -1,4 +1,4 @@
-# Budgex
+# Oboli
 
 Une application de **gestion de budget personnel**, en français, qui fonctionne
 entièrement dans le navigateur — **sans compte, sans serveur, sans connexion**.
@@ -60,7 +60,7 @@ L'app étant 100 % statique, aucune étape de build n'est nécessaire.
 1. Ouvre l'URL de l'app dans **Chrome**.
 2. Menu **⋮** en haut à droite → **Ajouter à l'écran d'accueil** (ou une
    bannière « Installer l'application » apparaît directement).
-3. Confirme. L'icône Budgex apparaît sur ton écran d'accueil ; elle s'ouvre en
+3. Confirme. L'icône Oboli apparaît sur ton écran d'accueil ; elle s'ouvre en
    plein écran, sans barre d'adresse.
 
 ### iPhone / iPad (Safari)
@@ -96,7 +96,7 @@ servir l'ancienne version**.
 À chaque mise à jour, **incrémente le numéro de version dans `sw.js`** :
 
 ```js
-const CACHE = 'budgex-v1';   // → 'budgex-v2', 'budgex-v3', etc.
+const CACHE = 'oboli-v2';   // → 'oboli-v3', 'oboli-v4', etc.
 ```
 
 Au prochain lancement, le service worker détecte le nouveau nom de cache,

@@ -1,5 +1,5 @@
 /*
- * store.js — Le cœur des données de Budgex.
+ * store.js — Le cœur des données d'Oboli.
  * Gère : le chargement/sauvegarde dans localStorage, les données de départ,
  * la bascule automatique de mois, et tous les calculs (totaux, disponible…).
  *
