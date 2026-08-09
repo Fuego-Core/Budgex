@@ -1,92 +1,48 @@
 /*
- * app.js — Le chef d'orchestre.
- *   - démarre l'application (chargement, bascule de mois, service worker),
- *   - gère la navigation entre les vues,
- *   - contient une fonction de rendu par vue,
- *   - branche les formulaires (feuilles modales) et les actions.
+ * app.js — Le chef d'orchestre (thème Nocturne).
+ *   - démarre l'app (chargement, bascule de mois, service worker),
+ *   - navigation entre les vues,
+ *   - une fonction de rendu par vue,
+ *   - feuilles modales et actions.
  *
- * S'appuie sur Store (données) et UI (affichage).
+ * S'appuie sur Store (données) et UI (affichage + animations).
  */
 
 const App = (() => {
-  // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
-  // tourne bien sur la dernière version, et pas sur un cache périmé).
-  const APP_VERSION = '21';
-
-  // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
+
+  const $ = (id) => document.getElementById(id);
 
   /* ------------------------------------------------------------------ *
    * Navigation
    * ------------------------------------------------------------------ */
 
-  // Vrai quand une transition de vue (View Transitions API) est en cours :
-  // dans ce cas on laisse la transition faire l'entrée (pas de cascade CSS).
-  let vtActive = false;
-  // Passe à true une fois l'app démarrée : on n'utilise pas les transitions de
-  // vues au tout premier affichage (le splash s'en charge).
-  let booted = false;
-
-  function prefersReducedMotion() {
-    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  }
-
-  // Applique l'état visuel de la vue (sections, onglets, sous-vue).
-  function applyViewClasses(view) {
+  function show(view) {
     currentView = view;
+
     document.querySelectorAll('.view').forEach((el) => {
       el.classList.toggle('active', el.id === `view-${view}`);
     });
+
     document.querySelectorAll('.tab').forEach((el) => {
       const isActive = el.dataset.view === view;
       el.classList.toggle('active', isActive);
       if (isActive) el.setAttribute('aria-current', 'page');
       else el.removeAttribute('aria-current');
     });
-    document.body.classList.toggle('subview', view === 'historique' || view === 'reglages');
-  }
 
-  // Ordre des vues, pour donner un sens aux transitions (glissement directionnel).
-  const VIEW_ORDER = { accueil: 0, factures: 1, epargne: 2, sorties: 3, credits: 4, historique: 5, reglages: 6 };
+    const isSub = view === 'historique' || view === 'reglages';
+    document.body.classList.toggle('subview', isSub);
 
-  function show(view) {
-    // Sens de la navigation : vers une vue « plus loin » = avant, sinon arrière.
-    const from = VIEW_ORDER[currentView] != null ? VIEW_ORDER[currentView] : 0;
-    const to = VIEW_ORDER[view] != null ? VIEW_ORDER[view] : 0;
-    document.documentElement.dataset.navDir = to >= from ? 'forward' : 'back';
-
-    const run = () => {
-      applyViewClasses(view);
-      window.scrollTo(0, 0);
-      render(true);
-    };
-    // Transitions de vues morphées (progressive enhancement) : douceur native
-    // entre les écrans. Repli sur la cascade CSS si non supporté, et jamais au
-    // premier affichage ni en « animations réduites ».
-    if (booted && document.startViewTransition && !prefersReducedMotion()) {
-      vtActive = true;
-      try {
-        const t = document.startViewTransition(run);
-        t.finished.finally(() => { vtActive = false; });
-      } catch (e) {
-        vtActive = false;
-        run();
-      }
-    } else {
-      run();
-    }
+    window.scrollTo(0, 0);
+    render();
   }
 
   /* ------------------------------------------------------------------ *
-   * Rendu — aiguille vers la bonne fonction selon la vue courante
+   * Rendu
    * ------------------------------------------------------------------ */
 
-  // Minuteur de nettoyage de la classe .enter (cascade d'entrée).
-  let enterTimer = null;
-
-  // render(enter) : `enter` = true seulement à la navigation (cascade + compteurs).
-  // Un simple rafraîchi (après une action) rend sans cascade : instantané.
-  function render(enter = false) {
+  function render() {
     switch (currentView) {
       case 'accueil': renderAccueil(); break;
       case 'factures': renderFactures(); break;
@@ -96,192 +52,20 @@ const App = (() => {
       case 'historique': renderHistorique(); break;
       case 'reglages': renderReglages(); break;
     }
+    UI.activate($(`view-${currentView}`));
     updateBadge();
-
-    const active = document.querySelector('.view.active');
-    if (!active) return;
-    enhanceSwipeRows(active); // rend les lignes supprimables balayables
-    if (enter) {
-      // Si une transition de vue est en cours, elle fait l'entrée : on ne double
-      // pas avec la cascade CSS ni les compteurs (les montants finaux s'affichent).
-      if (!vtActive) {
-        active.classList.add('enter');
-        countUp(active);
-        clearTimeout(enterTimer);
-        enterTimer = setTimeout(() => active.classList.remove('enter'), 1400);
-      }
-    } else {
-      active.classList.remove('enter');
-    }
   }
 
-  // Fait défiler les montants (.count[data-count-to]) de 0 vers leur valeur.
-  // Respecte « animations réduites » : dans ce cas, on laisse la valeur finale.
-  function countUp(scope) {
-    const reduce = window.matchMedia
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    scope.querySelectorAll('.count[data-count-to]').forEach((el) => {
-      const to = parseFloat(el.dataset.countTo) || 0;
-      const finalText = el.textContent;
-      if (reduce || Math.abs(to) < 1) return; // rien à animer : on garde le texte final
-      const DURATION = 700;
-      const t0 = performance.now();
-      el.textContent = UI.money(0);
-      const step = (now) => {
-        const p = Math.min(1, (now - t0) / DURATION);
-        const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
-        if (p < 1) {
-          el.textContent = UI.money(to * eased);
-          requestAnimationFrame(step);
-        } else {
-          el.textContent = finalText; // format final exact
-        }
-      };
-      requestAnimationFrame(step);
-    });
-  }
-
-  // Pastille sur l'icône de l'app (nombre de factures en retard).
-  // Ne fonctionne que sur les PWA installées qui supportent l'API Badging.
   function updateBadge() {
     if (!('setAppBadge' in navigator)) return;
     try {
       const late = Store.lateCount();
       if (late > 0) navigator.setAppBadge(late);
       else if ('clearAppBadge' in navigator) navigator.clearAppBadge();
-    } catch (e) {
-      /* silencieux : l'API peut échouer selon la plateforme */
-    }
+    } catch (e) { /* silencieux */ }
   }
 
-  // Rafraîchit tout (utile après une action qui touche plusieurs vues).
-  function refresh() {
-    render();
-  }
-
-  const $ = (id) => document.getElementById(id);
-
-  /* ------------------------------------------------------------------ *
-   * Geste : balayer une ligne vers la gauche pour la supprimer
-   * ------------------------------------------------------------------ */
-
-  // Emballe le contenu des lignes supprimables pour révéler un fond « Supprimer »
-  // quand on les fait glisser. Idempotent, rejoué à chaque rendu.
-  function enhanceSwipeRows(scope) {
-    if (prefersReducedMotion()) return; // mode calme : pas de balayage
-    scope.querySelectorAll('.list .row').forEach((row) => {
-      if (row.querySelector('.row-content')) return;         // déjà emballée
-      if (!row.querySelector('.trash[data-action]')) return; // seulement les supprimables
-      const content = document.createElement('div');
-      content.className = 'row-content';
-      while (row.firstChild) content.appendChild(row.firstChild);
-      const behind = document.createElement('div');
-      behind.className = 'row-behind';
-      behind.textContent = 'Supprimer';
-      row.appendChild(behind);
-      row.appendChild(content);
-    });
-  }
-
-  let swipe = null;
-  function onSwipeDown(e) {
-    const content = e.target.closest && e.target.closest('.row-content');
-    if (!content) return;
-    const row = content.closest('.row');
-    swipe = {
-      content, row, behind: row.querySelector('.row-behind'),
-      x0: e.clientX, y0: e.clientY, dx: 0, mode: null,
-    };
-  }
-  function onSwipeMove(e) {
-    if (!swipe) return;
-    const dx = e.clientX - swipe.x0;
-    const dy = e.clientY - swipe.y0;
-    if (swipe.mode === null) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      // Direction dominante : horizontale = balayage, verticale = défilement.
-      swipe.mode = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'scroll';
-      if (swipe.mode === 'swipe') {
-        swipe.content.style.transition = 'none';
-        try { swipe.content.setPointerCapture(e.pointerId); } catch (_) {}
-      }
-    }
-    if (swipe.mode !== 'swipe') return;
-    swipe.dx = Math.min(0, dx); // uniquement vers la gauche
-    swipe.content.style.transform = `translateX(${swipe.dx}px)`;
-    if (swipe.behind) swipe.behind.style.opacity = String(Math.min(1, -swipe.dx / 80));
-    if (e.cancelable) e.preventDefault();
-  }
-  function onSwipeEnd() {
-    if (!swipe) return;
-    const s = swipe;
-    swipe = null;
-    if (s.mode !== 'swipe') return;
-    s.content.style.transition = '';
-    s.content.style.transform = ''; // retombe en place
-    if (s.behind) s.behind.style.opacity = '';
-    const threshold = Math.min(120, s.row.offsetWidth * 0.35);
-    if (-s.dx > threshold) {
-      // Seuil franchi : petit retour haptique (action engageante), puis on route
-      // vers le flux existant (confirmation factures/crédits, annulation épargne/sorties).
-      if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
-      const trash = s.row.querySelector('.trash[data-action]');
-      if (trash) trash.click();
-    }
-  }
-
-  /* ------------------------------------------------------------------ *
-   * Écran d'ouverture (splash)
-   * ------------------------------------------------------------------ */
-
-  // Joue l'animation de lancement puis retire le splash. Respecte
-  // « animations réduites » (dans ce cas on l'enlève tout de suite).
-  function playIntro() {
-    const splash = document.getElementById('splash');
-    if (!splash) return;
-    const reduce = window.matchMedia
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduce) { splash.remove(); return; }
-    // On relance la cascade d'accueil juste au moment où le voile se lève :
-    // les cartes montent et les montants défilent pile à la révélation.
-    setTimeout(() => render(true), 950);
-    setTimeout(() => splash.classList.add('gone'), 1000);
-    setTimeout(() => splash.remove(), 1600);
-  }
-
-  /* ------------------------------------------------------------------ *
-   * Thème (auto / clair / sombre)
-   * ------------------------------------------------------------------ */
-
-  // Applique le thème choisi : pose data-theme sur <html> (le CSS fait le reste)
-  // et met la couleur de la barre système en accord.
-  function applyTheme(theme) {
-    const root = document.documentElement;
-    if (theme === 'light' || theme === 'dark') {
-      root.setAttribute('data-theme', theme);
-    } else {
-      root.removeAttribute('data-theme'); // 'auto' : on laisse le système décider
-    }
-
-    const DARK = '#0F1420';
-    const LIGHT = '#EEF1F7';
-    const metas = document.querySelectorAll('meta[name="theme-color"]');
-    if (theme === 'light' || theme === 'dark') {
-      // Forcé : même couleur partout, quel que soit le média du <meta>.
-      const c = theme === 'dark' ? DARK : LIGHT;
-      metas.forEach((m) => m.setAttribute('content', c));
-    } else {
-      // Auto : on rétablit les valeurs pilotées par le média.
-      const systemDark = window.matchMedia
-        && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      metas.forEach((m) => {
-        const media = m.getAttribute('media') || '';
-        if (media.includes('dark')) m.setAttribute('content', DARK);
-        else if (media.includes('light')) m.setAttribute('content', LIGHT);
-        else m.setAttribute('content', systemDark ? DARK : LIGHT);
-      });
-    }
-  }
+  function refresh() { render(); }
 
   /* ------------------------------------------------------------------ *
    * Vue Accueil
@@ -292,49 +76,30 @@ const App = (() => {
     const paid = Store.paidTotal();
     const unpaid = Store.unpaidTotal();
     const income = s.settings.income;
-    const free = Math.max(0, income - Store.totalCharges());
 
-    // Position du jour courant dans le mois (pour le curseur du ruban).
-    const now = new Date();
-    const dayRatio = (now.getDate() - 0.5) / Store.daysInMonth(Store.currentKey());
-
-    // Épargne du mois vers l'objectif.
     const saved = Store.savingsMonth();
     const goal = s.settings.savingsGoal || 0;
     const goalRatio = goal > 0 ? saved / goal : 0;
 
-    // Sorties : reste dans l'enveloppe.
     const spent = Store.outingsMonth();
     const envelope = Store.currentMonth().envelope;
     const remaining = envelope - spent;
     const spentRatio = envelope > 0 ? spent / envelope : 0;
 
-    // Prochaines échéances : 4 factures non payées, triées par jour.
-    const upcoming = Store.chargesSorted().filter((c) => !c.paid).slice(0, 4);
-
-    // Rappels : factures en retard + filet de sécurité des données.
+    const f = Store.forecast();
+    const upcoming = Store.chargesSorted().filter((c) => !c.paid).slice(0, 3);
     const late = Store.lateCount();
     const backup = Store.backupStatus();
 
-    // Première utilisation (app vierge) : on accueille et on oriente.
-    const firstRun =
-      s.settings.income === 0 && s.charges.length === 0 && s.credits.length === 0;
+    const firstRun = income === 0 && s.charges.length === 0 && s.credits.length === 0;
 
-    // Aperçu des crédits.
-    const creditsHtml = s.credits
-      .map((c) => {
-        const months = Store.creditMonthsLeft(c);
-        return `
-          <div class="mini-credit">
-            <span class="mini-credit-name">${UI.esc(c.name)}</span>
-            <span class="mini-credit-info">${UI.money(c.remaining)} · ${months} mois</span>
-          </div>`;
-      })
-      .join('');
+    const creditsHtml = s.credits.map((c) => `
+      <div class="mini-credit">
+        <span>${UI.esc(c.name)}</span>
+        <span class="mini-credit-info">${UI.money(c.remaining)} · ${Store.creditMonthsLeft(c)} mois</span>
+      </div>`).join('');
 
     $('view-accueil').innerHTML = `
-      <div class="brand-row">${brandLogo()}<span class="brand-name">Oboli</span></div>
-
       <header class="home-header">
         <div>
           <p class="eyebrow">Ce mois-ci</p>
@@ -346,83 +111,88 @@ const App = (() => {
         </div>
       </header>
 
-      <!-- Première utilisation : bienvenue et premiers pas -->
-      ${firstRun
-        ? `<div class="alert welcome">
-             <span>Bienvenue sur Oboli 👋 Commence par indiquer ton revenu, puis ajoute tes factures.</span>
-             <span class="alert-actions">
-               <button class="link" data-nav="reglages">Réglages</button>
-               <button class="link" data-nav="factures">Factures</button>
-             </span>
-           </div>`
-        : ''}
+      ${firstRun ? `
+        <div class="alert welcome">
+          <span>Bienvenue sur Oboli. Commence par indiquer ton revenu, puis ajoute tes factures.</span>
+          <span class="alert-actions">
+            <button class="link" data-nav="reglages">Réglages</button>
+            <button class="link" data-nav="factures">Factures</button>
+          </span>
+        </div>` : ''}
 
-      <!-- Rappels : en retard (corail) puis sauvegarde (ambre) -->
-      ${late > 0
-        ? `<button class="alert late" data-nav="factures">
-             <span>${late} facture${late > 1 ? 's' : ''} en retard</span>
-             <span class="alert-cta">Voir →</span>
-           </button>`
-        : ''}
-      ${backup.needed
-        ? `<div class="alert backup">
-             <span>${backup.days == null
-               ? 'Pense à sauvegarder tes données.'
-               : `Dernière sauvegarde il y a ${backup.days} jours.`}</span>
-             <span class="alert-actions">
-               <button class="link" data-action="do-backup">Exporter</button>
-               <button class="link muted" data-action="snooze-backup">Plus tard</button>
-             </span>
-           </div>`
-        : ''}
+      ${late > 0 ? `
+        <button class="alert late" data-nav="factures">
+          <span><i class="dot-live"></i>${late} facture${late > 1 ? 's' : ''} en retard</span>
+          <span class="alert-cta">Voir →</span>
+        </button>` : ''}
 
-      <!-- Le ruban du mois : la première chose à regarder -->
-      <section class="card ribbon-card">
-        ${UI.ribbon({ paid, unpaid, free, income, dayRatio })}
-        <div class="ribbon-legend">
+      ${backup.needed ? `
+        <div class="alert backup">
+          <span>${backup.days == null ? 'Pense à sauvegarder tes données.' : `Dernière sauvegarde il y a ${backup.days} jours.`}</span>
+          <span class="alert-actions">
+            <button class="link" data-action="do-backup">Exporter</button>
+            <button class="link muted" data-action="snooze-backup">Plus tard</button>
+          </span>
+        </div>` : ''}
+
+      <section class="card dial-card">
+        ${UI.dial({
+          paid, unpaid, income,
+          centerLabel: 'Disponible',
+          centerValue: Store.disponible(),
+          centerSub: `sur ${UI.money(income)} de revenu`,
+        })}
+        <div class="legend">
           <span><i class="dot mint"></i>Payé <b>${UI.money(paid)}</b></span>
           <span><i class="dot amber"></i>À payer <b>${UI.money(unpaid)}</b></span>
-          <span><i class="dot free"></i>Libre <b>${UI.money(free)}</b></span>
         </div>
       </section>
 
-      <!-- Grand chiffre : disponible après charges fixes -->
-      <section class="card big-figure">
-        <p class="eyebrow">Disponible après charges fixes</p>
-        <p class="figure ${Store.disponible() < 0 ? 'neg' : ''}">${UI.countMoney(Store.disponible())}</p>
-        <p class="subtle">${UI.money(income)} de revenu − ${UI.money(Store.totalCharges())} de charges</p>
-      </section>
+      <div class="quick">
+        <button data-action="add-outing">${icon('plus')}Sortie</button>
+        <button data-action="add-saving">${icon('up')}Épargner</button>
+        <button data-nav="factures">${icon('check')}Pointer</button>
+      </div>
 
-      <!-- Deux cartes : épargne du mois & sorties -->
       <div class="grid-2">
         <section class="card">
-          <p class="eyebrow">Épargne du mois</p>
-          <p class="figure-sm mint">${UI.money(saved)}</p>
-          <p class="subtle">Objectif ${UI.money(goal)}</p>
+          <p class="eyebrow">Épargne</p>
+          <p class="figure-sm mint-t">${UI.money(saved)}</p>
           ${UI.bar(goalRatio)}
+          <p class="subtle tiny">${goal > 0 ? `${Math.round(goalRatio * 100)} % de l’objectif` : 'Pas d’objectif fixé'}</p>
         </section>
         <section class="card">
           <p class="eyebrow">Sorties</p>
-          <p class="figure-sm ${remaining < 0 ? 'coral' : ''}">${UI.money(remaining)}</p>
-          <p class="subtle">restant sur ${UI.money(envelope)}</p>
+          <p class="figure-sm${remaining < 0 ? ' coral-t' : ''}">${UI.money(remaining)}</p>
           ${UI.bar(spentRatio, spentRatio > 0.85)}
+          <p class="subtle tiny">restant sur ${UI.money(envelope)}</p>
         </section>
       </div>
 
-      <!-- Prochaines échéances -->
+      ${envelope > 0 && spent > 0 ? `
+        <section class="card">
+          <div class="card-head">
+            <h2>Fin de mois estimée</h2>
+            <span class="badge ${f.over ? 'warn' : 'ok'}">${f.over ? 'Dépassement' : 'Dans les clous'}</span>
+          </div>
+          <p class="subtle" style="margin-top:2px">
+            À ce rythme : <b class="${f.over ? 'amber-t' : 'mint-t'}">${UI.money(f.projected)}</b> de sorties sur ${UI.money(f.envelope)}.
+            ${f.over ? '' : `Il reste ${UI.money(f.perDay)} par jour sur ${f.daysLeft} j.`}
+          </p>
+        </section>` : ''}
+
       <section class="card">
         <div class="card-head">
           <h2>Prochaines échéances</h2>
           <button class="link" data-nav="factures">Tout voir</button>
         </div>
         ${upcoming.length
-          ? `<ul class="list compact">${upcoming.map(homeChargeRow).join('')}</ul>`
+          ? `<ul class="list stagger">${upcoming.map(homeChargeRow).join('')}</ul>`
           : s.charges.length === 0
             ? `<p class="empty">Aucune facture enregistrée pour l’instant.</p>`
             : `<p class="empty">Tout est payé — aucune échéance en attente ce mois-ci.</p>`}
       </section>
 
-      <!-- Aperçu des crédits -->
       <section class="card">
         <div class="card-head">
           <h2>Crédits</h2>
@@ -435,21 +205,28 @@ const App = (() => {
     `;
   }
 
-  // Petit logo de marque (les barres ascendantes sur la tuile menthe, via CSS).
-  function brandLogo() {
-    return `<span class="brand-logo" aria-hidden="true"><svg viewBox="0 0 48 48" fill="#06231A">
-      <rect x="9" y="27" width="8" height="12" rx="2"/>
-      <rect x="20" y="19" width="8" height="20" rx="2"/>
-      <rect x="31" y="11" width="8" height="28" rx="2"/>
-    </svg></span>`;
+  // Pastille de jour : en retard (corail), sous 7 jours (ambre), sinon neutre.
+  function dayChipClass(c) {
+    if (c.late) return 'day-chip late';
+    if (c.daysLeft >= 0 && c.daysLeft <= 7) return 'day-chip soon';
+    return 'day-chip';
+  }
+
+  function dueLabel(c) {
+    if (c.late) return 'En retard';
+    if (c.daysLeft === 0) return 'Aujourd’hui';
+    if (c.daysLeft === 1) return 'Demain';
+    if (c.daysLeft > 0) return `dans ${c.daysLeft} jours`;
+    return `le ${c.dueDay}`;
   }
 
   function homeChargeRow(c) {
     return `
-      <li class="row">
+      <li class="row${c.late ? ' warn' : ''}">
+        <span class="${dayChipClass(c)}">${String(c.dueDay).padStart(2, '0')}</span>
         <span class="row-main">
           <span class="row-name">${UI.esc(c.name)}</span>
-          <span class="row-sub">le ${c.dueDay}${c.late ? ' <span class="badge late">En retard</span>' : ''}</span>
+          <span class="row-sub">${dueLabel(c)}</span>
         </span>
         <span class="row-amount">${UI.money(c.amount)}</span>
       </li>`;
@@ -464,16 +241,17 @@ const App = (() => {
     const total = Store.totalCharges();
     const paid = Store.paidTotal();
     const reste = total - paid;
+    const done = charges.filter((c) => c.paid).length;
 
     const rows = charges.map((c) => `
-      <li class="row charge ${c.paid ? 'done' : ''}" data-id="${c.id}">
+      <li class="row charge ${c.paid ? 'done' : ''}${c.late ? ' warn' : ''}" data-id="${c.id}">
         <button class="check ${c.paid ? 'on' : ''}" data-action="toggle" data-id="${c.id}"
                 aria-label="${c.paid ? 'Marquer comme non payé' : 'Marquer comme payé'}">
           ${c.paid ? icon('check') : ''}
         </button>
         <button class="row-main tap" data-action="edit-charge" data-id="${c.id}">
           <span class="row-name">${UI.esc(c.name)}</span>
-          <span class="row-sub">le ${c.dueDay}${c.late ? ' <span class="badge late">En retard</span>' : ''}</span>
+          <span class="row-sub">${c.paid ? `payé · le ${c.dueDay}` : dueLabel(c)}</span>
         </button>
         <span class="row-amount">${UI.money(c.amount)}</span>
         <button class="trash" data-action="del-charge" data-id="${c.id}" aria-label="Supprimer">${icon('trash')}</button>
@@ -481,14 +259,23 @@ const App = (() => {
 
     $('view-factures').innerHTML = `
       ${subHeader('Factures', `<button class="btn small" data-action="add-charge">+ Ajouter</button>`)}
-      <section class="card summary-3">
-        <div><p class="eyebrow">Total</p><p class="figure-xs">${UI.countMoney(total)}</p></div>
-        <div><p class="eyebrow">Payé</p><p class="figure-xs mint">${UI.countMoney(paid)}</p></div>
-        <div><p class="eyebrow">Reste</p><p class="figure-xs ${reste > 0 ? 'amber' : ''}">${UI.countMoney(reste)}</p></div>
+      <section class="card raised">
+        <div class="card-head" style="align-items:flex-start">
+          <div>
+            <p class="eyebrow">Reste à payer</p>
+            <p class="figure${reste > 0 ? ' amber-t' : ' mint-t'}" data-count="${reste}">${UI.money(reste)}</p>
+          </div>
+          <p class="subtle" style="text-align:right;margin:0">${done} sur ${charges.length}<br>pointées</p>
+        </div>
+        <div class="split">
+          <i class="paid" style="flex-grow:${Math.max(paid, 0.001)}"></i>
+          <i class="unpaid" style="flex-grow:${Math.max(reste, 0.001)}"></i>
+        </div>
+        <p class="subtle tiny">${UI.money(total)} de charges fixes ce mois-ci</p>
       </section>
       ${charges.length
-        ? `<ul class="list">${rows}</ul>`
-        : `<p class="empty card">Aucune facture pour l’instant. Ajoute ta première avec le bouton « + Ajouter » en haut.</p>`}
+        ? `<ul class="list stagger">${rows}</ul>`
+        : `<p class="empty card">Aucune facture pour l’instant. Ajoute ta première avec « + Ajouter » en haut.</p>`}
     `;
   }
 
@@ -500,33 +287,42 @@ const App = (() => {
     const totalAll = Store.savingsTotalAll();
     const series = Store.savingsSeries();
     const month = Store.currentMonth();
+    const goal = Store.getState().settings.savingsGoal || 0;
+    const saved = Store.savingsMonth();
+    const streak = Store.savingsStreak();
 
-    const rows = [...month.savings]
-      .reverse()
-      .map((v) => `
-        <li class="row" data-id="${v.id}">
-          <span class="row-main">
-            <span class="row-name">${v.note ? UI.esc(v.note) : 'Versement'}</span>
-            <span class="row-sub">${UI.shortDate(v.date)}</span>
-          </span>
-          <span class="row-amount mint">+${UI.money(v.amount)}</span>
-          <button class="trash" data-action="del-saving" data-id="${v.id}" aria-label="Supprimer">${icon('trash')}</button>
-        </li>`).join('');
+    const rows = [...month.savings].reverse().map((v) => `
+      <li class="row" data-id="${v.id}">
+        <span class="day-chip">${icon('up')}</span>
+        <span class="row-main">
+          <span class="row-name">${v.note ? UI.esc(v.note) : 'Versement'}</span>
+          <span class="row-sub">${UI.shortDate(v.date)}</span>
+        </span>
+        <span class="row-amount mint-t">+${UI.money(v.amount)}</span>
+        <button class="trash" data-action="del-saving" data-id="${v.id}" aria-label="Supprimer">${icon('trash')}</button>
+      </li>`).join('');
 
     $('view-epargne').innerHTML = `
       ${subHeader('Épargne', `<button class="btn small" data-action="add-saving">+ Ajouter</button>`)}
-      <section class="card savings-hero">
+      <section class="card mint">
         <p class="eyebrow">Total mis de côté</p>
-        <p class="figure">${UI.countMoney(totalAll)}</p>
+        <p class="figure" data-count="${totalAll}">${UI.money(totalAll)}</p>
+        <p class="subtle">+${UI.money(saved)} ce mois-ci${streak > 1 ? ` · ${streak} mois d’affilée` : ''}</p>
       </section>
       <section class="card">
-        <h2>Évolution</h2>
+        <div class="card-head">
+          <h2>Évolution</h2>
+          <span class="subtle" style="margin:0">${series.length} mois</span>
+        </div>
         ${UI.savingsChart(series)}
       </section>
       <section class="card">
-        <h2>Versements du mois</h2>
+        <div class="card-head">
+          <h2>Versements du mois</h2>
+          <span class="subtle" style="margin:0">${UI.money(saved)}${goal ? ` / ${UI.money(goal)}` : ''}</span>
+        </div>
         ${month.savings.length
-          ? `<ul class="list">${rows}</ul>`
+          ? `<ul class="list stagger">${rows}</ul>`
           : `<p class="empty">Rien mis de côté ce mois-ci pour l’instant. Chaque euro compte.</p>`}
       </section>
     `;
@@ -541,40 +337,66 @@ const App = (() => {
     const spent = Store.outingsMonth();
     const remaining = month.envelope - spent;
     const over = remaining < 0;
+    const f = Store.forecast();
+    const cats = Store.outingsByCategory();
 
-    // Rythme conseillé : ce qu'il reste réparti sur les jours restants du mois.
-    const now = new Date();
-    const daysLeft = Store.daysInMonth(Store.currentKey()) - now.getDate() + 1;
-    const perDay = !over && daysLeft > 0 ? remaining / daysLeft : null;
+    const rows = [...month.outings].reverse().map((o) => `
+      <li class="row" data-id="${o.id}">
+        <span class="day-chip">${String(new Date(o.date).getDate()).padStart(2, '0')}</span>
+        <span class="row-main">
+          <span class="row-name">${o.label ? UI.esc(o.label) : 'Sortie'}</span>
+          <span class="row-sub">${UI.esc(o.category || 'Divers')} · ${UI.shortDate(o.date)}</span>
+        </span>
+        <span class="row-amount">${UI.money(o.amount)}</span>
+        <button class="trash" data-action="del-outing" data-id="${o.id}" aria-label="Supprimer">${icon('trash')}</button>
+      </li>`).join('');
 
-    const rows = [...month.outings]
-      .reverse()
-      .map((o) => `
-        <li class="row" data-id="${o.id}">
-          <span class="row-main">
-            <span class="row-name">${o.label ? UI.esc(o.label) : 'Sortie'}</span>
-            <span class="row-sub">${UI.shortDate(o.date)}</span>
-          </span>
-          <span class="row-amount">${UI.money(o.amount)}</span>
-          <button class="trash" data-action="del-outing" data-id="${o.id}" aria-label="Supprimer">${icon('trash')}</button>
-        </li>`).join('');
+    const catsHtml = cats.map((c) => `
+      <div class="cat-row">
+        <span class="cat-name">${UI.esc(c.name)}</span>
+        <span class="cat-bar"><span data-width="${(c.ratio * 100).toFixed(1)}%"></span></span>
+        <span class="cat-amount">${UI.money(c.total)}</span>
+      </div>`).join('');
 
     $('view-sorties').innerHTML = `
       ${subHeader('Sorties', `<button class="btn small" data-action="add-outing">+ Ajouter</button>`)}
-      <section class="card outings-hero ${over ? 'over' : ''}">
-        <p class="eyebrow">Reste dans l’enveloppe</p>
-        <p class="figure ${over ? 'coral' : ''}">${UI.countMoney(remaining)}</p>
-        ${over
-          ? `<p class="subtle warn">Enveloppe dépassée. Ça se rattrape le mois prochain.</p>`
-          : `<p class="subtle">sur ${UI.money(month.envelope)} ce mois-ci</p>
-             ${perDay != null
-               ? `<p class="subtle tiny">≈ ${UI.money(perDay)} par jour d’ici la fin du mois (${daysLeft} j)</p>`
-               : ''}`}
-      </section>
       <section class="card">
-        <h2>Dépenses du mois</h2>
+        ${UI.gauge({
+          ratio: month.envelope > 0 ? spent / month.envelope : 0,
+          label: over ? 'Dépassement' : 'Reste',
+          value: Math.abs(remaining),
+          sub: over ? 'Ça se rattrape le mois prochain.' : `sur ${UI.money(month.envelope)} · ${f.daysLeft} jours`,
+          over,
+        })}
+      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <p class="eyebrow">Rythme</p>
+          <p class="figure-sm">${UI.money(f.perDay)}<span class="subtle" style="display:inline;margin-left:4px">/ jour</span></p>
+        </section>
+        <section class="card">
+          <p class="eyebrow">Dépensé</p>
+          <p class="figure-sm amber-t">${UI.money(spent)}</p>
+        </section>
+      </div>
+
+      ${cats.length ? `
+        <section class="card">
+          <div class="card-head">
+            <h2>Par catégorie</h2>
+            <span class="subtle" style="margin:0">${UI.money(spent)} / ${UI.money(month.envelope)}</span>
+          </div>
+          <div class="cats">${catsHtml}</div>
+        </section>` : ''}
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Dépenses du mois</h2>
+          <span class="subtle" style="margin:0">${month.outings.length}</span>
+        </div>
         ${month.outings.length
-          ? `<ul class="list">${rows}</ul>`
+          ? `<ul class="list stagger">${rows}</ul>`
           : `<p class="empty">L’enveloppe est intacte pour l’instant.</p>`}
       </section>
     `;
@@ -588,6 +410,9 @@ const App = (() => {
     const s = Store.getState();
     const totalRemaining = Store.creditsRemainingTotal();
     const totalMonthly = Store.creditsMonthlyTotal();
+    const totalInitial = s.credits.reduce((sum, c) => sum + c.initial, 0);
+    const repaidAll = Math.max(0, totalInitial - totalRemaining);
+    const payoff = Store.creditsPayoffKey();
 
     const cards = s.credits.map((c) => {
       const months = Store.creditMonthsLeft(c);
@@ -597,26 +422,42 @@ const App = (() => {
         <section class="card credit" data-id="${c.id}">
           <div class="card-head">
             <h2>${UI.esc(c.name)}</h2>
-            <span class="subtle">${UI.money(c.monthly)}/mois</span>
+            <span class="subtle" style="margin:0">${UI.money(c.monthly)}/mois</span>
           </div>
           <p class="credit-remaining">${UI.money(c.remaining)}<span class="subtle"> restants</span></p>
-          <p class="subtle">${formatMonths(months)}</p>
           ${UI.bar(ratio)}
-          <p class="subtle tiny">${Math.round(ratio * 100)} % remboursé</p>
+          <div class="credit-meta">
+            <span>${Math.round(ratio * 100)} % remboursé</span>
+            <span>${formatMonths(months)}</span>
+          </div>
           <div class="credit-actions">
             <button class="btn small" data-action="credit-pay" data-id="${c.id}">Verser en plus</button>
             <button class="btn small ghost" data-action="credit-edit" data-id="${c.id}">Corriger</button>
-            <button class="btn small ghost danger" data-action="credit-del" data-id="${c.id}">Supprimer</button>
+            <button class="btn small ghost" data-action="credit-del" data-id="${c.id}" aria-label="Supprimer">${icon('trash')}</button>
           </div>
         </section>`;
     }).join('');
 
     $('view-credits').innerHTML = `
       ${subHeader('Crédits', `<button class="btn small" data-action="add-credit">+ Ajouter</button>`)}
-      <section class="card summary-2">
-        <div><p class="eyebrow">Restant à rembourser</p><p class="figure-xs">${UI.countMoney(totalRemaining)}</p></div>
-        <div><p class="eyebrow">Mensualités</p><p class="figure-xs">${UI.countMoney(totalMonthly)}</p></div>
-      </section>
+      ${s.credits.length ? `
+        <section class="card raised">
+          <div class="card-head" style="align-items:flex-start">
+            <div>
+              <p class="eyebrow">Restant à rembourser</p>
+              <p class="figure" data-count="${totalRemaining}">${UI.money(totalRemaining)}</p>
+            </div>
+            <div style="text-align:right">
+              <p class="eyebrow">Par mois</p>
+              <p class="figure-xs">${UI.money(totalMonthly)}</p>
+            </div>
+          </div>
+          <div class="split">
+            <i class="paid" style="flex-grow:${Math.max(repaidAll, 0.001)}"></i>
+            <i class="rest" style="flex-grow:${Math.max(totalRemaining, 0.001)}"></i>
+          </div>
+          <p class="subtle tiny">${payoff ? `Dernière échéance estimée : <b>${capitalize(UI.monthLabel(payoff))} ${payoff.split('-')[0]}</b>` : ''}</p>
+        </section>` : ''}
       ${s.credits.length ? cards : `<p class="empty card">Aucun crédit. Profite de cette tranquillité.</p>`}
     `;
   }
@@ -628,10 +469,20 @@ const App = (() => {
   function renderHistorique() {
     const s = Store.getState();
     const current = Store.currentKey();
-    // Tous les mois sauf le mois courant, du plus récent au plus ancien.
-    const keys = Object.keys(s.months).filter((k) => k !== current).sort().reverse();
+    const keys = Object.keys(s.months).sort();
+    const past = keys.filter((k) => k !== current).sort().reverse();
 
-    const cards = keys.map((k) => {
+    // Barres : épargne des 6 derniers mois, mois courant inclus.
+    const lastKeys = keys.slice(-6);
+    const maxSaving = Math.max(...lastKeys.map((k) => Store.savingsMonth(k)), 1);
+    const bars = lastKeys.map((k) => {
+      const v = Store.savingsMonth(k);
+      const h = Math.max(6, Math.round((v / maxSaving) * 88));
+      const now = k === current;
+      return `<div><i class="${now ? 'now' : ''}" style="height:${h}px"></i><small class="${now ? 'now' : ''}">${UI.monthLabel(k)}</small></div>`;
+    }).join('');
+
+    const cards = past.map((k) => {
       const m = s.months[k];
       const paidCount = Object.keys(m.paid).length;
       const allPaid = s.charges.length > 0 && paidCount >= s.charges.length;
@@ -639,15 +490,14 @@ const App = (() => {
       const outings = m.outings.reduce((sum, v) => sum + v.amount, 0);
       const over = outings > m.envelope;
       return `
-        <section class="card history">
+        <section class="card">
           <div class="card-head">
             <h2>${capitalize(UI.monthLabel(k))} ${k.split('-')[0]}</h2>
-            ${allPaid ? `<span class="badge ok">Tout payé</span>` : ''}
+            <span class="badge ${allPaid ? 'ok' : 'warn'}">${allPaid ? 'Tout payé' : `${paidCount}/${s.charges.length} payées`}</span>
           </div>
-          <div class="history-grid">
-            <div><p class="eyebrow">Charges payées</p><p class="figure-xs">${paidCount}/${s.charges.length}</p></div>
-            <div><p class="eyebrow">Épargne</p><p class="figure-xs mint">${UI.money(savings)}</p></div>
-            <div><p class="eyebrow">Sorties</p><p class="figure-xs ${over ? 'coral' : ''}">${UI.money(outings)}</p></div>
+          <div style="display:flex;gap:22px">
+            <div><p class="eyebrow">Épargne</p><p class="figure-xs mint-t">${UI.money(savings)}</p></div>
+            <div><p class="eyebrow">Sorties</p><p class="figure-xs${over ? ' coral-t' : ''}">${UI.money(outings)}</p></div>
             <div><p class="eyebrow">Enveloppe</p><p class="figure-xs">${UI.money(m.envelope)}</p></div>
           </div>
         </section>`;
@@ -655,8 +505,13 @@ const App = (() => {
 
     $('view-historique').innerHTML = `
       ${backHeader('Historique')}
-      ${keys.length
-        ? cards
+      ${lastKeys.length > 1 ? `
+        <section class="card raised">
+          <p class="eyebrow">Épargne par mois</p>
+          <div class="month-bars">${bars}</div>
+        </section>` : ''}
+      ${past.length
+        ? `<div class="stagger">${cards}</div>`
         : `<p class="empty card">Pas encore d’historique. Reviens le mois prochain : chaque mois clôturé s’ajoutera ici.</p>`}
     `;
   }
@@ -667,72 +522,47 @@ const App = (() => {
 
   function renderReglages() {
     const s = Store.getState();
-    const theme = (s.settings && s.settings.theme) || 'auto';
+    const backup = Store.backupStatus();
     $('view-reglages').innerHTML = `
       ${backHeader('Réglages')}
       <section class="card">
         <h2>Ton budget</h2>
         <label class="field">
           <span>Revenu mensuel</span>
-          <input type="number" inputmode="decimal" id="set-income" value="${s.settings.income}" step="1" min="0">
+          <span class="wrap"><input type="number" inputmode="decimal" id="set-income" value="${s.settings.income}" step="1" min="0"><span class="unit">€</span></span>
         </label>
         <label class="field">
           <span>Objectif d’épargne / mois</span>
-          <input type="number" inputmode="decimal" id="set-goal" value="${s.settings.savingsGoal}" step="1" min="0">
+          <span class="wrap"><input type="number" inputmode="decimal" id="set-goal" value="${s.settings.savingsGoal}" step="1" min="0"><span class="unit">€</span></span>
         </label>
         <label class="field">
           <span>Enveloppe sorties / mois</span>
-          <input type="number" inputmode="decimal" id="set-envelope" value="${s.settings.outingBudget}" step="1" min="0">
+          <span class="wrap"><input type="number" inputmode="decimal" id="set-envelope" value="${s.settings.outingBudget}" step="1" min="0"><span class="unit">€</span></span>
         </label>
         <button class="btn" data-action="save-settings">Enregistrer</button>
       </section>
 
       <section class="card">
-        <h2>Apparence</h2>
-        <p class="subtle">Choisis le thème, ou laisse-le suivre ton téléphone.</p>
-        <div class="segmented" role="group" aria-label="Thème">
-          <button class="seg-btn ${theme === 'auto' ? 'on' : ''}" data-action="set-theme" data-theme="auto"
-            ${theme === 'auto' ? 'aria-pressed="true"' : ''}>Auto</button>
-          <button class="seg-btn ${theme === 'light' ? 'on' : ''}" data-action="set-theme" data-theme="light"
-            ${theme === 'light' ? 'aria-pressed="true"' : ''}>Clair</button>
-          <button class="seg-btn ${theme === 'dark' ? 'on' : ''}" data-action="set-theme" data-theme="dark"
-            ${theme === 'dark' ? 'aria-pressed="true"' : ''}>Sombre</button>
-        </div>
-      </section>
-
-      <section class="card">
         <h2>Sauvegarde</h2>
-        <p class="subtle">Tes données ne quittent jamais ce téléphone. Exporte-les de temps en temps pour ne rien perdre.</p>
+        <p class="subtle">Tes données ne quittent jamais ce téléphone.${
+          backup.days != null ? ` Dernière sauvegarde il y a ${backup.days} jours.` : ' Aucune sauvegarde pour l’instant.'}</p>
         <div class="btn-row">
-          <button class="btn" data-action="export">Exporter (.json)</button>
-          <!-- Import via un <label> qui contient l'input : le sélecteur de fichier
-               s'ouvre nativement au tap (plus fiable que .click() sur PWA iOS). -->
-          <!-- L'input transparent recouvre tout le bouton : le picker s'ouvre au
-               tap de façon fiable (un input en display:none ne s'ouvre pas
-               toujours sur Chrome Android). Pas de filtre accept non plus. -->
-          <label class="btn ghost file-btn">Importer un fichier
-            <input type="file" id="import-file" class="file-input">
-          </label>
+          <button class="btn soft" data-action="export">Exporter (.json)</button>
+          <button class="btn ghost" data-action="import">Importer</button>
         </div>
-        <p class="subtle tiny" style="text-align:center;margin-top:10px">
-          L’import ne marche pas ?
-          <button class="link" data-action="import-paste">Colle le contenu à la place</button>
-        </p>
-        <p id="import-status" class="subtle tiny import-status" style="display:none"></p>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
       </section>
 
       <section class="card danger-zone">
         <h2>Repartir de zéro</h2>
         <p class="subtle">Efface tout et repart d’une app vierge. Sans retour en arrière.</p>
-        <button class="btn danger" data-action="reset">Tout effacer</button>
+        <div style="margin-top:14px"><button class="btn danger" data-action="reset">Tout effacer</button></div>
       </section>
-
-      <p class="subtle tiny app-version">Oboli · version ${APP_VERSION}</p>
     `;
   }
 
   /* ------------------------------------------------------------------ *
-   * Fragments d'en-tête réutilisables
+   * Fragments d'en-tête
    * ------------------------------------------------------------------ */
 
   function subHeader(title, actions = '') {
@@ -747,18 +577,34 @@ const App = (() => {
   }
 
   /* ------------------------------------------------------------------ *
-   * Formulaires — feuilles modales
+   * Feuilles modales
    * ------------------------------------------------------------------ */
+
+  // Pastilles de montants : ajoutent au champ au lieu de le remplacer.
+  function quickAmounts(values) {
+    return `<div class="chips" data-quick>${values.map((v) => `<button type="button" class="chip" data-plus="${v}">+${v} €</button>`).join('')}</div>`;
+  }
+
+  function bindQuickAmounts(sheet) {
+    const input = sheet.querySelector('#f-amount');
+    sheet.querySelectorAll('[data-plus]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cur = parseFloat(input.value) || 0;
+        input.value = +(cur + parseFloat(btn.dataset.plus)).toFixed(2);
+        input.dispatchEvent(new Event('input'));
+      });
+    });
+  }
 
   function chargeSheet(existing) {
     const c = existing || { name: '', amount: '', dueDay: '' };
     const body = `
       <label class="field"><span>Nom</span>
-        <input id="f-name" type="text" value="${UI.esc(c.name)}" placeholder="Loyer, énergie…"></label>
-      <label class="field"><span>Montant (€)</span>
-        <input id="f-amount" type="number" inputmode="decimal" step="0.01" min="0" value="${c.amount}"></label>
+        <span class="wrap"><input id="f-name" type="text" value="${UI.esc(c.name)}" placeholder="Loyer, énergie…"></span></label>
+      <label class="field"><span>Montant</span>
+        <span class="wrap"><input id="f-amount" type="number" inputmode="decimal" step="0.01" min="0" value="${c.amount}"><span class="unit">€</span></span></label>
       <label class="field"><span>Jour d’échéance</span>
-        <input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${c.dueDay}"></label>
+        <span class="wrap"><input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${c.dueDay}"><span class="unit">du mois</span></span></label>
       <button class="btn" id="f-save">${existing ? 'Enregistrer' : 'Ajouter la facture'}</button>
     `;
     UI.openSheet(existing ? 'Modifier la facture' : 'Nouvelle facture', body, (sheet) => {
@@ -770,13 +616,8 @@ const App = (() => {
           UI.toast('Vérifie le nom, le montant et le jour.');
           return;
         }
-        if (existing) {
-          Store.updateCharge(existing.id, { name, amount, dueDay });
-          UI.toast('Facture modifiée.');
-        } else {
-          Store.addCharge({ name, amount, dueDay });
-          UI.toast('Facture ajoutée.');
-        }
+        if (existing) { Store.updateCharge(existing.id, { name, amount, dueDay }); UI.toast('Facture modifiée.'); }
+        else { Store.addCharge({ name, amount, dueDay }); UI.toast('Facture ajoutée.'); }
         UI.closeSheet();
         refresh();
       });
@@ -784,14 +625,19 @@ const App = (() => {
   }
 
   function savingSheet() {
+    const goal = Store.getState().settings.savingsGoal || 0;
+    const saved = Store.savingsMonth();
     const body = `
-      <label class="field"><span>Montant (€)</span>
-        <input id="f-amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="50"></label>
+      <label class="field big"><span>Montant</span>
+        <span class="wrap"><input id="f-amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="50"><span class="unit">€</span></span></label>
+      ${quickAmounts([10, 20, 50, 100])}
       <label class="field"><span>Note (facultatif)</span>
-        <input id="f-note" type="text" placeholder="Prime, économie du mois…"></label>
+        <span class="wrap"><input id="f-note" type="text" placeholder="Prime, économie du mois…"></span></label>
       <button class="btn" id="f-save">Mettre de côté</button>
+      ${goal > 0 ? `<p class="sheet-hint">Objectif du mois : ${UI.money(saved)} / ${UI.money(goal)}</p>` : ''}
     `;
     UI.openSheet('Nouveau versement', body, (sheet) => {
+      bindQuickAmounts(sheet);
       sheet.querySelector('#f-save').addEventListener('click', () => {
         const amount = parseFloat(sheet.querySelector('#f-amount').value);
         const note = sheet.querySelector('#f-note').value.trim();
@@ -805,19 +651,49 @@ const App = (() => {
   }
 
   function outingSheet() {
+    const remaining = Store.outingsRemaining();
     const body = `
-      <label class="field"><span>Montant (€)</span>
-        <input id="f-amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="25"></label>
+      <label class="field big"><span>Montant</span>
+        <span class="wrap"><input id="f-amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="25"><span class="unit">€</span></span></label>
+      ${quickAmounts([5, 10, 20, 50])}
       <label class="field"><span>Intitulé</span>
-        <input id="f-label" type="text" placeholder="Restaurant, cinéma…"></label>
+        <span class="wrap"><input id="f-label" type="text" placeholder="Restaurant, cinéma…"></span></label>
+      <span class="field"><span>Catégorie</span></span>
+      <div class="chips" data-cats>
+        ${Store.CATEGORIES.map((c, i) => `<button type="button" class="chip${i === 0 ? ' on' : ''}" data-cat="${c}">${c}</button>`).join('')}
+      </div>
       <button class="btn" id="f-save">Ajouter la dépense</button>
+      <p class="sheet-hint" id="f-hint">Il reste ${UI.money(remaining)} dans l’enveloppe</p>
     `;
     UI.openSheet('Nouvelle sortie', body, (sheet) => {
+      bindQuickAmounts(sheet);
+
+      let category = Store.CATEGORIES[0];
+      sheet.querySelectorAll('[data-cat]').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          sheet.querySelectorAll('[data-cat]').forEach((c) => c.classList.remove('on'));
+          chip.classList.add('on');
+          category = chip.dataset.cat;
+        });
+      });
+
+      // Aperçu vivant du reste d'enveloppe pendant la saisie.
+      const input = sheet.querySelector('#f-amount');
+      const hint = sheet.querySelector('#f-hint');
+      input.addEventListener('input', () => {
+        const v = parseFloat(input.value) || 0;
+        const left = remaining - v;
+        hint.textContent = left >= 0
+          ? `Il restera ${UI.money(left)} dans l’enveloppe`
+          : `Enveloppe dépassée de ${UI.money(-left)}`;
+        hint.style.color = left >= 0 ? '' : '#FF6F5E';
+      });
+
       sheet.querySelector('#f-save').addEventListener('click', () => {
-        const amount = parseFloat(sheet.querySelector('#f-amount').value);
+        const amount = parseFloat(input.value);
         const label = sheet.querySelector('#f-label').value.trim();
         if (!(amount > 0)) { UI.toast('Indique un montant.'); return; }
-        Store.addOuting({ amount, label });
+        Store.addOuting({ amount, label, category });
         UI.closeSheet();
         UI.toast('Sortie enregistrée.');
         refresh();
@@ -827,12 +703,14 @@ const App = (() => {
 
   function creditPaySheet(credit) {
     const body = `
-      <p class="subtle">Solde actuel : ${UI.money(credit.remaining)}</p>
-      <label class="field"><span>Montant versé en plus (€)</span>
-        <input id="f-amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="500"></label>
+      <p class="subtle" style="margin-top:0">Solde actuel : ${UI.money(credit.remaining)}</p>
+      <label class="field big"><span>Montant versé en plus</span>
+        <span class="wrap"><input id="f-amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="500"><span class="unit">€</span></span></label>
+      ${quickAmounts([100, 250, 500])}
       <button class="btn" id="f-save">Verser en plus</button>
     `;
     UI.openSheet('Remboursement anticipé', body, (sheet) => {
+      bindQuickAmounts(sheet);
       sheet.querySelector('#f-save').addEventListener('click', () => {
         const amount = parseFloat(sheet.querySelector('#f-amount').value);
         if (!(amount > 0)) { UI.toast('Indique un montant.'); return; }
@@ -849,11 +727,11 @@ const App = (() => {
     const isNew = !existing;
     const body = `
       ${isNew ? `<label class="field"><span>Nom</span>
-        <input id="f-name" type="text" placeholder="Crédit auto…"></label>` : ''}
-      <label class="field"><span>Restant dû (€)</span>
-        <input id="f-remaining" type="number" inputmode="decimal" step="0.01" min="0" value="${c.remaining}"></label>
-      <label class="field"><span>Mensualité (€)</span>
-        <input id="f-monthly" type="number" inputmode="decimal" step="0.01" min="0" value="${c.monthly}"></label>
+        <span class="wrap"><input id="f-name" type="text" placeholder="Crédit auto…"></span></label>` : ''}
+      <label class="field"><span>Restant dû</span>
+        <span class="wrap"><input id="f-remaining" type="number" inputmode="decimal" step="0.01" min="0" value="${c.remaining}"><span class="unit">€</span></span></label>
+      <label class="field"><span>Mensualité</span>
+        <span class="wrap"><input id="f-monthly" type="number" inputmode="decimal" step="0.01" min="0" value="${c.monthly}"><span class="unit">€</span></span></label>
       <button class="btn" id="f-save">${isNew ? 'Ajouter le crédit' : 'Enregistrer'}</button>
     `;
     UI.openSheet(isNew ? 'Nouveau crédit' : 'Corriger le crédit', body, (sheet) => {
@@ -864,13 +742,7 @@ const App = (() => {
         if (isNew) {
           const name = sheet.querySelector('#f-name').value.trim();
           if (!name) { UI.toast('Donne un nom au crédit.'); return; }
-          const s = Store.getState();
-          s.credits.push({
-            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-            name, remaining, initial: remaining, monthly,
-            lastApplied: Store.currentKey(),
-          });
-          Store.save();
+          Store.addCredit({ name, remaining, monthly });
           UI.toast('Crédit ajouté.');
         } else {
           Store.updateCredit(existing.id, { remaining, monthly });
@@ -882,24 +754,17 @@ const App = (() => {
     });
   }
 
-  /* ------------------------------------------------------------------ *
-   * Confirmation générique (feuille modale)
-   * ------------------------------------------------------------------ */
-
-  function confirmSheet(title, message, confirmLabel, onConfirm, danger = true) {
+  function confirmSheet(title, message, confirmLabel, onConfirm) {
     const body = `
-      <p class="subtle">${message}</p>
+      <p class="subtle" style="margin-top:0">${message}</p>
       <div class="btn-row">
         <button class="btn ghost" id="c-cancel">Annuler</button>
-        <button class="btn ${danger ? 'danger' : ''}" id="c-ok">${confirmLabel}</button>
+        <button class="btn danger" id="c-ok">${confirmLabel}</button>
       </div>
     `;
     UI.openSheet(title, body, (sheet) => {
       sheet.querySelector('#c-cancel').addEventListener('click', UI.closeSheet);
-      sheet.querySelector('#c-ok').addEventListener('click', () => {
-        UI.closeSheet();
-        onConfirm();
-      });
+      sheet.querySelector('#c-ok').addEventListener('click', () => { UI.closeSheet(); onConfirm(); });
     });
   }
 
@@ -908,8 +773,7 @@ const App = (() => {
    * ------------------------------------------------------------------ */
 
   function doExport() {
-    const data = Store.exportJSON();
-    const blob = new Blob([data], { type: 'application/json' });
+    const blob = new Blob([Store.exportJSON()], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -918,156 +782,25 @@ const App = (() => {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    Store.markExported(); // met à jour le filet de sécurité des données
+    Store.markExported();
     UI.toast('Export téléchargé.');
-  }
-
-  // Affiche l'état de l'import dans les Réglages (visible à chaque étape) :
-  // permet de voir exactement où ça bloque quand « rien ne se passe ».
-  function setImportStatus(msg, isError) {
-    const el = $('import-status');
-    if (!el) return;
-    el.textContent = msg || '';
-    el.style.display = msg ? 'block' : 'none';
-    el.classList.toggle('warn', !!isError);
-  }
-
-  // Récupère un fichier éventuellement en attente dans l'input et le traite.
-  // Indispensable sur Android : au retour du sélecteur, l'événement 'change'
-  // n'est pas toujours émis, et un re-rendu recréerait l'input (fichier perdu).
-  // On lit donc le fichier ici, avant tout ré-affichage. Retourne true si un
-  // fichier a été pris en charge.
-  function checkPendingImportFile() {
-    const input = $('import-file');
-    if (!input || !input.files || !input.files[0]) return false;
-    const f = input.files[0];
-    input.value = ''; // vide l'input tout de suite : évite un double traitement
-    setImportStatus('Fichier « ' + f.name + ' » reçu (' + f.size + ' o), lecture…');
-    doImport(f);
-    return true;
   }
 
   function doImport(file) {
     const reader = new FileReader();
     reader.onload = () => {
-      const text = reader.result;
-      const len = text ? String(text).length : 0;
-      if (!text || !String(text).trim()) {
-        setImportStatus('Le fichier lu est vide (0 caractère). Essaie « Colle le contenu ».', true);
-        UI.toast('Le fichier semble vide.');
-        return;
-      }
-      setImportStatus('Fichier lu (' + len + ' caractères), import en cours…');
-      const ok = applyImport(text);
-      if (!ok) {
-        setImportStatus('Import refusé : le contenu n’est pas une sauvegarde valide (peut-être tronqué). Essaie « Colle le contenu ».', true);
-      }
+      try { Store.importJSON(reader.result); UI.toast('Données importées.'); refresh(); }
+      catch (e) { UI.toast(e.message || 'Import impossible.'); }
     };
-    reader.onerror = () => {
-      setImportStatus('Lecture du fichier impossible sur cet appareil. Essaie « Colle le contenu ».', true);
-      UI.toast('Lecture du fichier impossible.');
-    };
+    reader.onerror = () => UI.toast('Lecture du fichier impossible.');
     reader.readAsText(file);
   }
 
-  // Applique un texte de sauvegarde. Retourne true si l'import a réussi.
-  function applyImport(text) {
-    try {
-      Store.importJSON(text);
-      const s = Store.getState();
-      const nc = s.charges.length;
-      const nk = s.credits.length;
-      applyTheme((s.settings && s.settings.theme) || 'auto');
-      show('accueil'); // on montre le résultat tout de suite
-      UI.toast(`Sauvegarde importée : ${nc} facture${nc > 1 ? 's' : ''}, ${nk} crédit${nk > 1 ? 's' : ''}.`);
-      return true;
-    } catch (e) {
-      UI.toast(e.message || 'Import impossible.');
-      return false;
-    }
-  }
-
-  // Repli d'import 100 % fiable : l'utilisateur colle le contenu de sa sauvegarde.
-  // Utile quand le sélecteur de fichier est capricieux (PWA installée sur iOS).
-  function importPasteSheet() {
-    const body = `
-      <p class="subtle">Ouvre ton fichier de sauvegarde (.json) dans une autre app,
-        copie tout son contenu, puis colle-le ici.</p>
-      <label class="field"><span>Contenu de la sauvegarde</span>
-        <textarea id="f-paste" placeholder='{ "version": 1, "settings": { ... }, ... }'></textarea></label>
-      <p id="f-paste-count" class="subtle tiny" style="margin:-6px 0 8px">0 caractère collé</p>
-      <p id="f-paste-err" class="subtle warn" style="display:none"></p>
-      <button class="btn" id="f-import">Importer</button>
-    `;
-    UI.openSheet('Importer depuis un texte', body, (sheet) => {
-      const err = sheet.querySelector('#f-paste-err');
-      const ta = sheet.querySelector('#f-paste');
-      const count = sheet.querySelector('#f-paste-count');
-      // Compteur en direct : permet de voir si le collage est complet ou tronqué.
-      const updateCount = () => {
-        const n = ta.value.length;
-        count.textContent = n + ' caractère' + (n > 1 ? 's' : '') + ' collé' + (n > 1 ? 's' : '');
-        // Une sauvegarde complète fait au moins quelques centaines de caractères.
-        const looksClosed = /}\s*$/.test(ta.value.trim());
-        if (n > 0 && !looksClosed) {
-          count.textContent += ' — ⚠️ le texte ne se termine pas par « } », il est peut-être tronqué';
-          count.classList.add('warn');
-        } else {
-          count.classList.remove('warn');
-        }
-      };
-      ta.addEventListener('input', updateCount);
-      sheet.querySelector('#f-import').addEventListener('click', () => {
-        err.style.display = 'none';
-        const txt = sheet.querySelector('#f-paste').value;
-        if (!txt.trim()) {
-          err.textContent = 'Colle d’abord le contenu de ta sauvegarde.';
-          err.style.display = 'block';
-          return;
-        }
-        try {
-          Store.importJSON(txt);
-          const s = Store.getState();
-          const nc = s.charges.length;
-          const nk = s.credits.length;
-          applyTheme((s.settings && s.settings.theme) || 'auto');
-          UI.closeSheet();
-          show('accueil');
-          UI.toast(`Sauvegarde importée : ${nc} facture${nc > 1 ? 's' : ''}, ${nk} crédit${nk > 1 ? 's' : ''}.`);
-        } catch (e) {
-          // Erreur affichée dans la feuille (persistante), pas en toast fugace.
-          err.textContent = (e.message || 'Import impossible.') + ' Vérifie que tu as bien collé TOUT le contenu du fichier.';
-          err.style.display = 'block';
-        }
-      });
-    });
-  }
-
   /* ------------------------------------------------------------------ *
-   * Sortie animée d'une ligne avant sa suppression
-   * ------------------------------------------------------------------ */
-
-  // Replie la ligne (id) puis exécute `done` (suppression + rafraîchi).
-  // Si l'élément est absent ou les animations sont réduites, on enchaîne direct.
-  function animateRowRemoval(id, done) {
-    const row = document.querySelector(`.view.active .row[data-id="${id}"]`);
-    const reduce = window.matchMedia
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!row || reduce) { done(); return; }
-
-    let called = false;
-    const finish = () => { if (called) return; called = true; done(); };
-    row.classList.add('removing');
-    row.addEventListener('animationend', finish, { once: true });
-    setTimeout(finish, 320); // filet de sécurité si animationend ne part pas
-  }
-
-  /* ------------------------------------------------------------------ *
-   * Gestion centralisée des clics (délégation d'événements)
+   * Clics (délégation)
    * ------------------------------------------------------------------ */
 
   function onClick(e) {
-    // Navigation par boutons icônes / liens.
     const nav = e.target.closest('[data-nav]');
     if (nav) { show(nav.dataset.nav); return; }
 
@@ -1080,15 +813,11 @@ const App = (() => {
     switch (action) {
       case 'toggle':
         Store.togglePaid(id);
-        // Petite vibration de confirmation (si le téléphone la supporte).
-        if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
         refresh();
         break;
 
       case 'add-charge': chargeSheet(); break;
-      case 'edit-charge':
-        chargeSheet(s.charges.find((c) => c.id === id));
-        break;
+      case 'edit-charge': chargeSheet(s.charges.find((c) => c.id === id)); break;
       case 'del-charge': {
         const c = s.charges.find((x) => x.id === id);
         confirmSheet('Supprimer la facture', `Supprimer « ${c ? UI.esc(c.name) : ''} » ?`, 'Supprimer', () => {
@@ -1102,13 +831,11 @@ const App = (() => {
         const list = Store.currentMonth().savings;
         const idx = list.findIndex((x) => x.id === id);
         const item = list[idx];
-        animateRowRemoval(id, () => {
-          Store.removeSaving(id);
-          refresh();
-          UI.toast('Versement supprimé.', {
-            actionLabel: 'Annuler',
-            onAction: () => { Store.restoreSaving(item, idx); refresh(); UI.toast('Versement restauré.'); },
-          });
+        Store.removeSaving(id);
+        refresh();
+        UI.toast('Versement supprimé.', {
+          actionLabel: 'Annuler',
+          onAction: () => { Store.restoreSaving(item, idx); refresh(); UI.toast('Versement restauré.'); },
         });
         break;
       }
@@ -1118,13 +845,11 @@ const App = (() => {
         const list = Store.currentMonth().outings;
         const idx = list.findIndex((x) => x.id === id);
         const item = list[idx];
-        animateRowRemoval(id, () => {
-          Store.removeOuting(id);
-          refresh();
-          UI.toast('Sortie supprimée.', {
-            actionLabel: 'Annuler',
-            onAction: () => { Store.restoreOuting(item, idx); refresh(); UI.toast('Sortie restaurée.'); },
-          });
+        Store.removeOuting(id);
+        refresh();
+        UI.toast('Sortie supprimée.', {
+          actionLabel: 'Annuler',
+          onAction: () => { Store.restoreOuting(item, idx); refresh(); UI.toast('Sortie restaurée.'); },
         });
         break;
       }
@@ -1149,40 +874,22 @@ const App = (() => {
         break;
       }
 
-      case 'set-theme': {
-        const theme = el.dataset.theme;
-        Store.setTheme(theme);
-        applyTheme(theme);
-        render(); // met à jour l'état actif des boutons du sélecteur
-        UI.toast(
-          theme === 'auto' ? 'Thème : automatique.'
-            : theme === 'light' ? 'Thème clair.'
-              : 'Thème sombre.'
-        );
-        break;
-      }
-
       case 'export': doExport(); break;
-      case 'import-paste': importPasteSheet(); break;
-
+      case 'import': $('import-file').click(); break;
       case 'do-backup': doExport(); refresh(); break;
-      case 'snooze-backup':
-        Store.snoozeBackup(); refresh(); UI.toast('Rappel repoussé d’une semaine.');
-        break;
+      case 'snooze-backup': Store.snoozeBackup(); refresh(); UI.toast('Rappel repoussé d’une semaine.'); break;
 
       case 'reset':
-        confirmSheet(
-          'Repartir de zéro',
+        confirmSheet('Repartir de zéro',
           'Tout sera effacé et l’app repartira vierge. Cette action est définitive.',
           'Oui, tout effacer',
-          () => { Store.resetAll(); show('accueil'); UI.toast('Tout est effacé. On repart à neuf.'); }
-        );
+          () => { Store.resetAll(); show('accueil'); UI.toast('Tout est effacé. On repart à neuf.'); });
         break;
     }
   }
 
   /* ------------------------------------------------------------------ *
-   * Icônes SVG en ligne (pas d'images externes)
+   * Icônes SVG en ligne
    * ------------------------------------------------------------------ */
 
   function icon(name) {
@@ -1191,35 +898,26 @@ const App = (() => {
       gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
       back: '<path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>',
       check: '<path d="M20 6L9 17l-5-5"/>',
+      plus: '<path d="M12 5v14M5 12h14"/>',
+      up: '<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>',
       trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>',
-      home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
-      bill: '<path d="M4 2h16v20l-3-2-3 2-2-2-2 2-3-2V2z"/><path d="M8 7h8M8 11h8M8 15h5"/>',
-      piggy: '<path d="M4 12a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v3a2 2 0 0 1-2 2h-1l-1 2h-3l-1-2H9l-1 2H5a2 2 0 0 1-2-2z"/><circle cx="15" cy="11" r="1"/>',
-      cup: '<path d="M5 8h14v6a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5z"/><path d="M19 9h1a2 2 0 0 1 0 4h-1"/><path d="M8 3v2M12 3v2M16 3v2"/>',
-      card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
     };
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ''}</svg>`;
   }
 
   /* ------------------------------------------------------------------ *
-   * Utilitaires divers
+   * Utilitaires
    * ------------------------------------------------------------------ */
 
-  function capitalize(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  }
+  function capitalize(str) { return str.charAt(0).toUpperCase() + str.slice(1); }
 
-
-  // Nombre de mois → « 1 an et 2 mois » si ≥ 12, sinon « 8 mois ».
   function formatMonths(n) {
     if (n <= 0) return 'Soldé';
     if (n < 12) return `${n} mois restants`;
     const years = Math.floor(n / 12);
     const rest = n % 12;
-    const y = `${years} an${years > 1 ? 's' : ''}`;
-    const m = rest ? ` et ${rest} mois` : '';
-    return `${y}${m} restants`;
+    return `${years} an${years > 1 ? 's' : ''}${rest ? ` et ${rest} mois` : ''} restants`;
   }
 
   /* ------------------------------------------------------------------ *
@@ -1229,64 +927,35 @@ const App = (() => {
   function init() {
     Store.load();
 
-    // Thème choisi (auto / clair / sombre) appliqué avant le premier rendu.
-    applyTheme((Store.getState().settings && Store.getState().settings.theme) || 'auto');
+    // Jeu de démonstration : ?demo dans l'URL (pour les captures / l'essai).
+    if (location.search.includes('demo')) Store.seedDemo();
 
-    // Onglets du bas.
     document.querySelectorAll('.tab').forEach((tab) => {
       tab.addEventListener('click', () => show(tab.dataset.view));
     });
 
-    // Un seul écouteur de clic pour toute l'app (délégation).
     document.body.addEventListener('click', onClick);
 
-    // Balayage-pour-supprimer sur les lignes (délégation).
-    document.body.addEventListener('pointerdown', onSwipeDown);
-    document.body.addEventListener('pointermove', onSwipeMove);
-    document.body.addEventListener('pointerup', onSwipeEnd);
-    document.body.addEventListener('pointercancel', onSwipeEnd);
-
-    // Import de fichier — cas normal : l'événement 'change' se déclenche.
     document.body.addEventListener('change', (e) => {
-      if (e.target && e.target.id === 'import-file') checkPendingImportFile();
+      if (e.target && e.target.id === 'import-file' && e.target.files[0]) {
+        doImport(e.target.files[0]);
+        e.target.value = '';
+      }
     });
-
-    // Filets de secours pour Android : au retour du sélecteur de fichier,
-    // 'change' n'est pas toujours émis, ET le fichier peut n'être attaché à
-    // l'input qu'avec un léger délai. On revérifie donc plusieurs fois.
-    // IMPORTANT : on ne ré-affiche PAS la page au retour (sauf bascule de mois),
-    // car un render() recréerait l'input et perdrait le fichier en cours.
-    const recheckImport = () => {
-      checkPendingImportFile();
-      setTimeout(checkPendingImportFile, 300);
-      setTimeout(checkPendingImportFile, 900);
-    };
-    window.addEventListener('focus', recheckImport);
 
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible') return;
-      recheckImport();
-      // On ne re-rend QUE si le mois a réellement basculé (rollover() renvoie
-      // true) : sinon on préserve la page (et le champ fichier) intacte.
-      if (Store.rollover()) render();
+      if (document.visibilityState === 'visible') { Store.rollover(); render(); }
     });
 
-    // On demande un stockage « persistant » : le navigateur évite alors
-    // d'effacer nos données pour faire de la place. Filet de sécurité.
     if (navigator.storage && navigator.storage.persist) {
       navigator.storage.persist().catch(() => {});
     }
 
-    // Enregistrement du service worker avec mise à jour automatique.
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').catch((err) =>
           console.warn('Service worker non enregistré :', err));
 
-        // Si l'app était déjà contrôlée par un worker, un changement de
-        // contrôleur = une nouvelle version vient de s'activer → on recharge
-        // une seule fois pour servir les fichiers à jour. (Pas de rechargement
-        // au tout premier lancement, où il n'y a pas encore de contrôleur.)
         if (navigator.serviceWorker.controller) {
           let reloaded = false;
           navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1299,9 +968,6 @@ const App = (() => {
     }
 
     show('accueil');
-    playIntro();
-    // À partir d'ici, les navigations utilisent les transitions de vues.
-    booted = true;
   }
 
   return { init, show, refresh };

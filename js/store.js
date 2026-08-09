@@ -1,79 +1,78 @@
 /*
  * store.js — Le cœur des données d'Oboli.
- * Gère : le chargement/sauvegarde dans localStorage, les données de départ,
- * la bascule automatique de mois, et tous les calculs (totaux, disponible…).
+ * localStorage, données de départ, bascule de mois, calculs.
  *
- * Aucune dépendance externe. Tout vit dans un seul objet `Store`.
+ * Ajouts de cette version :
+ *   - catégorie sur les sorties (+ répartition par catégorie),
+ *   - prévision de fin de mois,
+ *   - date estimée de fin des crédits,
+ *   - jeu de démonstration (Store.seedDemo) pour les captures.
  */
 
 const Store = (() => {
-  // Clé unique sous laquelle tout l'état est rangé dans le navigateur.
   const STORAGE_KEY = 'budgex.v1';
 
-  // L'état vivant en mémoire. Rempli par load() au démarrage.
+  // Catégories de sorties. « Divers » sert de repli pour les anciennes données.
+  const CATEGORIES = ['Resto', 'Bar', 'Culture', 'Courses', 'Divers'];
+
   let state = null;
 
   /* ------------------------------------------------------------------ *
-   * Petites fonctions utilitaires de dates
+   * Utilitaires de dates
    * ------------------------------------------------------------------ */
 
-  // Identifiant unique et court, sans dépendance externe.
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
 
-  // Clé de mois « AAAA-MM » à partir d'une Date (mois par défaut : aujourd'hui).
   function monthKey(date = new Date()) {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     return `${y}-${m}`;
   }
 
-  // Nombre de mois entiers écoulés entre deux clés « AAAA-MM ».
-  // monthsBetween('2026-06', '2026-08') === 2
   function monthsBetween(fromKey, toKey) {
     const [fy, fm] = fromKey.split('-').map(Number);
     const [ty, tm] = toKey.split('-').map(Number);
     return (ty - fy) * 12 + (tm - fm);
   }
 
-  // Nombre de jours dans le mois d'une clé « AAAA-MM ».
   function daysInMonth(key) {
     const [y, m] = key.split('-').map(Number);
-    return new Date(y, m, 0).getDate(); // jour 0 du mois suivant = dernier jour
+    return new Date(y, m, 0).getDate();
+  }
+
+  // Clé de mois décalée de n mois. addMonths('2026-08', 23) → '2028-07'
+  function addMonths(key, n) {
+    const [y, m] = key.split('-').map(Number);
+    const d = new Date(y, m - 1 + n, 1);
+    return monthKey(d);
   }
 
   /* ------------------------------------------------------------------ *
    * Données de départ
    * ------------------------------------------------------------------ */
 
-  // Construit un état neuf et VIDE : chacun renseigne son propre budget.
-  // (L'app démarre sans factures ni crédits ; l'accueil guide les premiers pas.)
   function seed() {
     const now = monthKey();
     return {
-      version: 1,
-      settings: { income: 0, savingsGoal: 0, outingBudget: 0, theme: 'auto' },
+      version: 2,
+      settings: { income: 0, savingsGoal: 0, outingBudget: 0 },
       charges: [],
       credits: [],
-      months: {
-        [now]: { paid: {}, savings: [], outings: [], envelope: 0 },
-      },
+      months: { [now]: { paid: {}, savings: [], outings: [], envelope: 0 } },
       lastOpened: now,
-      // Métadonnées : suivi des sauvegardes pour le filet de sécurité des données.
       meta: { lastExport: null, backupSnooze: null },
     };
   }
 
-  // Garantit la présence du bloc `meta` (pour les anciens états importés).
   function ensureMeta() {
     if (!state.meta) state.meta = { lastExport: null, backupSnooze: null };
-  }
-
-  // Garantit des réglages complets (pour les anciennes sauvegardes sans thème).
-  function ensureSettings() {
-    if (!state.settings) state.settings = { income: 0, savingsGoal: 0, outingBudget: 0 };
-    if (!state.settings.theme) state.settings.theme = 'auto';
+    if (!state.version || state.version < 2) state.version = 2;
+    // Migration douce : les sorties sans catégorie deviennent « Divers ».
+    for (const m of Object.values(state.months || {})) {
+      for (const o of m.outings || []) if (!o.category) o.category = 'Divers';
+    }
   }
 
   /* ------------------------------------------------------------------ *
@@ -84,27 +83,21 @@ const Store = (() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
-      // Le stockage peut être plein ou bloqué (navigation privée) : on prévient.
       console.warn('Sauvegarde impossible :', e);
     }
   }
 
   function load() {
     let raw = null;
-    try {
-      raw = localStorage.getItem(STORAGE_KEY);
-    } catch (e) {
-      console.warn('Lecture du stockage impossible :', e);
-    }
+    try { raw = localStorage.getItem(STORAGE_KEY); }
+    catch (e) { console.warn('Lecture du stockage impossible :', e); }
 
     if (!raw) {
       state = seed();
       save();
     } else {
-      try {
-        state = JSON.parse(raw);
-      } catch (e) {
-        // Données corrompues : on repart proprement plutôt que de planter.
+      try { state = JSON.parse(raw); }
+      catch (e) {
         console.warn('Données illisibles, réinitialisation :', e);
         state = seed();
         save();
@@ -112,51 +105,32 @@ const Store = (() => {
     }
 
     ensureMeta();
-    ensureSettings();
-    rollover(); // met l'état à jour selon le mois courant
+    rollover();
     return state;
   }
 
   /* ------------------------------------------------------------------ *
-   * Bascule de mois — appelée au lancement et au retour au premier plan
+   * Bascule de mois
    * ------------------------------------------------------------------ */
 
-  // Garantit qu'un enregistrement existe pour la clé de mois donnée.
   function ensureMonth(key) {
     if (!state.months[key]) {
       state.months[key] = {
-        paid: {},
-        savings: [],
-        outings: [],
+        paid: {}, savings: [], outings: [],
         envelope: state.settings.outingBudget,
       };
     }
     return state.months[key];
   }
 
-  // Cœur de la bascule : nouveau mois → factures « à payer », crédits décrémentés.
-  // Retourne true si quelque chose a changé (pour redéclencher un rendu).
   function rollover() {
     const now = monthKey();
     let changed = false;
 
-    // 1) Un enregistrement vide pour le mois courant si besoin.
-    //    Les factures redeviennent automatiquement « à payer » car
-    //    l'objet `paid` du nouveau mois est vide.
-    if (!state.months[now]) {
-      ensureMonth(now);
-      changed = true;
-    }
+    if (!state.months[now]) { ensureMonth(now); changed = true; }
 
-    // 2) Décrément des crédits, une seule fois par mois via `lastApplied`.
-    //    Si plusieurs mois se sont écoulés, on décrémente d'autant de mensualités.
     for (const credit of state.credits) {
-      if (!credit.lastApplied) {
-        // Ancien crédit sans repère : on l'ancre au mois courant sans décrémenter.
-        credit.lastApplied = now;
-        changed = true;
-        continue;
-      }
+      if (!credit.lastApplied) { credit.lastApplied = now; changed = true; continue; }
       const elapsed = monthsBetween(credit.lastApplied, now);
       if (elapsed > 0) {
         const total = credit.monthly * elapsed;
@@ -166,57 +140,36 @@ const Store = (() => {
       }
     }
 
-    // 3) On mémorise le dernier mois ouvert.
-    if (state.lastOpened !== now) {
-      state.lastOpened = now;
-      changed = true;
-    }
+    if (state.lastOpened !== now) { state.lastOpened = now; changed = true; }
 
     if (changed) save();
     return changed;
   }
 
   /* ------------------------------------------------------------------ *
-   * Accès à l'état
+   * Accès
    * ------------------------------------------------------------------ */
 
-  function getState() {
-    return state;
-  }
-
-  function currentKey() {
-    return monthKey();
-  }
-
-  // Enregistrement du mois courant (créé au besoin).
-  function currentMonth() {
-    return ensureMonth(currentKey());
-  }
+  function getState() { return state; }
+  function currentKey() { return monthKey(); }
+  function currentMonth() { return ensureMonth(currentKey()); }
 
   /* ------------------------------------------------------------------ *
-   * Calculs — charges & disponible
+   * Charges & disponible
    * ------------------------------------------------------------------ */
 
   function totalCharges() {
     return state.charges.reduce((sum, c) => sum + c.amount, 0);
   }
 
-  // Total des factures cochées « payées » pour le mois courant.
   function paidTotal() {
     const paid = currentMonth().paid;
     return state.charges.reduce((sum, c) => sum + (paid[c.id] ? c.amount : 0), 0);
   }
 
-  function unpaidTotal() {
-    return totalCharges() - paidTotal();
-  }
+  function unpaidTotal() { return totalCharges() - paidTotal(); }
+  function disponible() { return state.settings.income - totalCharges(); }
 
-  // Disponible après charges fixes = revenu − total des charges.
-  function disponible() {
-    return state.settings.income - totalCharges();
-  }
-
-  // Les factures triées par jour d'échéance, enrichies de leur état.
   function chargesSorted() {
     const paid = currentMonth().paid;
     const today = new Date().getDate();
@@ -225,17 +178,16 @@ const Store = (() => {
       .map((c) => ({
         ...c,
         paid: !!paid[c.id],
-        late: !paid[c.id] && c.dueDay < today, // échéance passée et non réglée
+        late: !paid[c.id] && c.dueDay < today,
+        daysLeft: c.dueDay - today,
       }));
   }
 
-  // Nombre de factures en retard (échéance passée, non payées) ce mois-ci.
-  function lateCount() {
-    return chargesSorted().filter((c) => c.late).length;
-  }
+  function lateCount() { return chargesSorted().filter((c) => c.late).length; }
+  function paidCount() { return Object.keys(currentMonth().paid).length; }
 
   /* ------------------------------------------------------------------ *
-   * Calculs — épargne
+   * Épargne
    * ------------------------------------------------------------------ */
 
   function savingsMonth(key = currentKey()) {
@@ -243,16 +195,11 @@ const Store = (() => {
     return m ? m.savings.reduce((s, v) => s + v.amount, 0) : 0;
   }
 
-  // Cumul de toute l'épargne, tous mois confondus.
   function savingsTotalAll() {
     return Object.values(state.months).reduce(
-      (sum, m) => sum + m.savings.reduce((s, v) => s + v.amount, 0),
-      0
-    );
+      (sum, m) => sum + m.savings.reduce((s, v) => s + v.amount, 0), 0);
   }
 
-  // Série cumulée mois par mois, triée chronologiquement.
-  // Retourne [{ key, monthly, cumulative }] pour le graphique.
   function savingsSeries() {
     const keys = Object.keys(state.months).sort();
     let running = 0;
@@ -263,8 +210,19 @@ const Store = (() => {
     });
   }
 
+  // Nombre de mois consécutifs (jusqu'au mois courant) avec au moins un versement.
+  function savingsStreak() {
+    const keys = Object.keys(state.months).sort().reverse();
+    let streak = 0;
+    for (const k of keys) {
+      if (savingsMonth(k) > 0) streak++;
+      else if (k !== currentKey()) break;
+    }
+    return streak;
+  }
+
   /* ------------------------------------------------------------------ *
-   * Calculs — sorties
+   * Sorties
    * ------------------------------------------------------------------ */
 
   function outingsMonth(key = currentKey()) {
@@ -272,27 +230,60 @@ const Store = (() => {
     return m ? m.outings.reduce((s, v) => s + v.amount, 0) : 0;
   }
 
-  // Ce qu'il reste dans l'enveloppe du mois courant (peut être négatif).
-  function outingsRemaining() {
-    return currentMonth().envelope - outingsMonth();
+  function outingsRemaining() { return currentMonth().envelope - outingsMonth(); }
+
+  // Répartition par catégorie du mois courant, triée du plus gros au plus petit.
+  function outingsByCategory(key = currentKey()) {
+    const m = state.months[key];
+    if (!m) return [];
+    const totals = new Map();
+    for (const o of m.outings) {
+      const cat = o.category || 'Divers';
+      totals.set(cat, (totals.get(cat) || 0) + o.amount);
+    }
+    const max = Math.max(...totals.values(), 1);
+    return [...totals.entries()]
+      .map(([name, total]) => ({ name, total, ratio: total / max }))
+      .sort((a, b) => b.total - a.total);
+  }
+
+  // Prévision : au rythme actuel, où finit-on le mois ?
+  function forecast() {
+    const key = currentKey();
+    const day = new Date().getDate();
+    const dim = daysInMonth(key);
+    const spent = outingsMonth();
+    const envelope = currentMonth().envelope;
+    const projected = day > 0 ? (spent / day) * dim : 0;
+    const daysLeft = dim - day + 1;
+    const perDay = daysLeft > 0 ? Math.max(0, envelope - spent) / daysLeft : 0;
+    return {
+      projected: Math.round(projected),
+      envelope,
+      over: projected > envelope && envelope > 0,
+      daysLeft,
+      perDay,
+    };
   }
 
   /* ------------------------------------------------------------------ *
-   * Calculs — crédits
+   * Crédits
    * ------------------------------------------------------------------ */
 
-  function creditsRemainingTotal() {
-    return state.credits.reduce((s, c) => s + c.remaining, 0);
-  }
+  function creditsRemainingTotal() { return state.credits.reduce((s, c) => s + c.remaining, 0); }
+  function creditsMonthlyTotal() { return state.credits.reduce((s, c) => s + c.monthly, 0); }
 
-  function creditsMonthlyTotal() {
-    return state.credits.reduce((s, c) => s + c.monthly, 0);
-  }
-
-  // Nombre de mois restants pour solder un crédit (arrondi au supérieur).
   function creditMonthsLeft(credit) {
     if (credit.monthly <= 0) return 0;
     return Math.ceil(credit.remaining / credit.monthly);
+  }
+
+  // Clé du mois de la dernière échéance, tous crédits confondus (ou null).
+  function creditsPayoffKey() {
+    if (!state.credits.length) return null;
+    const max = Math.max(...state.credits.map(creditMonthsLeft));
+    if (!isFinite(max) || max <= 0) return null;
+    return addMonths(currentKey(), max);
   }
 
   /* ------------------------------------------------------------------ *
@@ -313,17 +304,11 @@ const Store = (() => {
 
   function updateCharge(id, { name, amount, dueDay }) {
     const c = state.charges.find((x) => x.id === id);
-    if (c) {
-      c.name = name;
-      c.amount = amount;
-      c.dueDay = dueDay;
-      save();
-    }
+    if (c) { c.name = name; c.amount = amount; c.dueDay = dueDay; save(); }
   }
 
   function removeCharge(id) {
     state.charges = state.charges.filter((c) => c.id !== id);
-    // On nettoie aussi les marques « payé » dans tous les mois.
     for (const m of Object.values(state.months)) delete m.paid[id];
     save();
   }
@@ -333,12 +318,7 @@ const Store = (() => {
    * ------------------------------------------------------------------ */
 
   function addSaving({ amount, note }) {
-    currentMonth().savings.push({
-      id: uid(),
-      amount,
-      note: note || '',
-      date: new Date().toISOString(),
-    });
+    currentMonth().savings.push({ id: uid(), amount, note: note || '', date: new Date().toISOString() });
     save();
   }
 
@@ -348,11 +328,9 @@ const Store = (() => {
     save();
   }
 
-  // Réinsère un versement supprimé à sa position d'origine (pour « Annuler »).
   function restoreSaving(item, index) {
     const m = currentMonth();
-    const i = Math.max(0, Math.min(index, m.savings.length));
-    m.savings.splice(i, 0, item);
+    m.savings.splice(Math.max(0, Math.min(index, m.savings.length)), 0, item);
     save();
   }
 
@@ -360,11 +338,11 @@ const Store = (() => {
    * Mutations — sorties
    * ------------------------------------------------------------------ */
 
-  function addOuting({ amount, label }) {
+  function addOuting({ amount, label, category }) {
     currentMonth().outings.push({
-      id: uid(),
-      amount,
+      id: uid(), amount,
       label: label || '',
+      category: CATEGORIES.includes(category) ? category : 'Divers',
       date: new Date().toISOString(),
     });
     save();
@@ -376,11 +354,9 @@ const Store = (() => {
     save();
   }
 
-  // Réinsère une sortie supprimée à sa position d'origine (pour « Annuler »).
   function restoreOuting(item, index) {
     const m = currentMonth();
-    const i = Math.max(0, Math.min(index, m.outings.length));
-    m.outings.splice(i, 0, item);
+    m.outings.splice(Math.max(0, Math.min(index, m.outings.length)), 0, item);
     save();
   }
 
@@ -388,23 +364,24 @@ const Store = (() => {
    * Mutations — crédits
    * ------------------------------------------------------------------ */
 
-  // Verser en plus : un remboursement anticipé qui réduit le solde.
-  function addCreditPayment(id, extra) {
-    const c = state.credits.find((x) => x.id === id);
-    if (c) {
-      c.remaining = Math.max(0, +(c.remaining - extra).toFixed(2));
-      save();
-    }
+  function addCredit({ name, remaining, monthly }) {
+    state.credits.push({
+      id: uid(), name, remaining, initial: remaining, monthly,
+      lastApplied: currentKey(),
+    });
+    save();
   }
 
-  // Corriger : ajuster le restant dû et la mensualité.
+  function addCreditPayment(id, extra) {
+    const c = state.credits.find((x) => x.id === id);
+    if (c) { c.remaining = Math.max(0, +(c.remaining - extra).toFixed(2)); save(); }
+  }
+
   function updateCredit(id, { remaining, monthly }) {
     const c = state.credits.find((x) => x.id === id);
     if (c) {
       c.remaining = remaining;
       c.monthly = monthly;
-      // On garde `initial` comme le maximum vu, pour que la barre de
-      // progression reste cohérente si l'on corrige le solde vers le haut.
       if (remaining > c.initial) c.initial = remaining;
       save();
     }
@@ -416,44 +393,28 @@ const Store = (() => {
   }
 
   /* ------------------------------------------------------------------ *
-   * Mutations — réglages & données
+   * Réglages & données
    * ------------------------------------------------------------------ */
 
   function updateSettings({ income, savingsGoal, outingBudget }) {
     state.settings.income = income;
     state.settings.savingsGoal = savingsGoal;
     state.settings.outingBudget = outingBudget;
-    // L'enveloppe du mois courant suit le nouveau réglage.
     currentMonth().envelope = outingBudget;
     save();
   }
 
-  function resetAll() {
-    state = seed();
-    save();
-  }
+  function resetAll() { state = seed(); save(); }
 
-  // Mémorise le thème choisi : 'auto' | 'light' | 'dark'.
-  function setTheme(theme) {
-    ensureSettings();
-    state.settings.theme = theme;
-    save();
-  }
+  function exportJSON() { return JSON.stringify(state, null, 2); }
 
-  // Exporte l'état complet en chaîne JSON lisible.
-  function exportJSON() {
-    return JSON.stringify(state, null, 2);
-  }
-
-  // À appeler juste après un export réussi : mémorise la date.
   function markExported() {
     ensureMeta();
     state.meta.lastExport = new Date().toISOString();
-    state.meta.backupSnooze = null; // on repart d'une ardoise propre
+    state.meta.backupSnooze = null;
     save();
   }
 
-  // Repousse le rappel de sauvegarde d'une semaine.
   function snoozeBackup() {
     ensureMeta();
     const in7days = new Date();
@@ -462,59 +423,29 @@ const Store = (() => {
     save();
   }
 
-  // Vrai s'il existe des données qui valent la peine d'être sauvegardées.
   function hasMeaningfulData() {
     const months = Object.values(state.months);
     if (Object.keys(state.months).length > 1) return true;
-    return months.some(
-      (m) => m.savings.length || m.outings.length || Object.keys(m.paid).length
-    );
+    return months.some((m) => m.savings.length || m.outings.length || Object.keys(m.paid).length);
   }
 
-  // Statut du filet de sécurité : faut-il rappeler d'exporter ?
-  // Retourne { needed, days } où `days` = jours depuis le dernier export (ou null).
   function backupStatus() {
     ensureMeta();
     const now = new Date();
-
-    // Rappel mis en veille ?
-    if (state.meta.backupSnooze && now < new Date(state.meta.backupSnooze)) {
-      return { needed: false, days: null };
-    }
+    if (state.meta.backupSnooze && now < new Date(state.meta.backupSnooze)) return { needed: false, days: null };
     if (!hasMeaningfulData()) return { needed: false, days: null };
-
     if (!state.meta.lastExport) return { needed: true, days: null };
-
     const days = Math.floor((now - new Date(state.meta.lastExport)) / 86400000);
     return { needed: days >= 30, days };
   }
 
-  // Importe un JSON (chaîne). Valide la structure ; lève une erreur claire sinon.
   function importJSON(text) {
     let data;
-    // On retire un éventuel BOM UTF-8 en tête (fréquent quand un fichier est
-    // réécrit par iOS/Fichiers ou un éditeur) et les espaces autour : sans ça,
-    // JSON.parse échoue et la sauvegarde semble « ne pas revenir ».
-    let clean = String(text).replace(/^\uFEFF/, '').trim();
-    // Normalise les guillemets typographiques : le copier-coller mobile remplace
-    // parfois " par \u201C \u201D et ' par \u2018 \u2019, ce qui fait \u00E9chouer JSON.parse \u00E0 tort.
-    clean = clean
-      .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')
-      .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'");
-    try {
-      data = JSON.parse(clean);
-    } catch (e) {
-      throw new Error('Fichier illisible : ce n’est pas du JSON valide.');
-    }
-    // Validation minimale mais suffisante pour éviter d'écraser avec n'importe quoi.
-    if (
-      !data ||
-      typeof data !== 'object' ||
-      !data.settings ||
-      !Array.isArray(data.charges) ||
-      !Array.isArray(data.credits) ||
-      typeof data.months !== 'object'
-    ) {
+    try { data = JSON.parse(text); }
+    catch (e) { throw new Error('Fichier illisible : ce n’est pas du JSON valide.'); }
+    if (!data || typeof data !== 'object' || !data.settings ||
+        !Array.isArray(data.charges) || !Array.isArray(data.credits) ||
+        typeof data.months !== 'object') {
       throw new Error('Fichier invalide : structure de budget non reconnue.');
     }
     state = data;
@@ -524,67 +455,75 @@ const Store = (() => {
   }
 
   /* ------------------------------------------------------------------ *
-   * Interface publique
+   * Démonstration — pour les captures et l'essai à blanc.
+   * N'est appelée que si l'URL contient « ?demo » (voir app.js).
    * ------------------------------------------------------------------ */
 
+  function seedDemo() {
+    const now = currentKey();
+    const prev = addMonths(now, -1);
+    const prev2 = addMonths(now, -2);
+    const iso = (day) => {
+      const [y, m] = now.split('-').map(Number);
+      return new Date(y, m - 1, day).toISOString();
+    };
+
+    state = seed();
+    state.settings = { income: 2400, savingsGoal: 300, outingBudget: 250 };
+    state.charges = [
+      { id: 'c1', name: 'Loyer', amount: 780, dueDay: 5 },
+      { id: 'c2', name: 'Énergie', amount: 95, dueDay: 8 },
+      { id: 'c3', name: 'Internet', amount: 39, dueDay: 10 },
+      { id: 'c4', name: 'Assurance habitation', amount: 62, dueDay: 15 },
+      { id: 'c5', name: 'Téléphone', amount: 22, dueDay: 20 },
+      { id: 'c6', name: 'Mutuelle', amount: 48, dueDay: 28 },
+    ];
+    state.credits = [
+      { id: 'k1', name: 'Crédit auto', remaining: 6420, initial: 12000, monthly: 285, lastApplied: now },
+      { id: 'k2', name: 'Prêt travaux', remaining: 2100, initial: 6000, monthly: 150, lastApplied: now },
+    ];
+    state.months = {
+      [prev2]: { paid: { c1: true, c2: true, c3: true, c4: true, c5: true },
+        savings: [{ id: 's0', amount: 180, note: 'Économie du mois', date: iso(4) }],
+        outings: [{ id: 'o0', amount: 240, label: 'Divers', category: 'Divers', date: iso(9) }], envelope: 250 },
+      [prev]: { paid: { c1: true, c2: true, c3: true, c4: true, c5: true, c6: true },
+        savings: [{ id: 's1', amount: 300, note: 'Économie du mois', date: iso(3) }],
+        outings: [{ id: 'o1', amount: 268, label: 'Sorties', category: 'Resto', date: iso(12) }], envelope: 250 },
+      [now]: {
+        paid: { c1: true, c2: true, c3: true },
+        savings: [
+          { id: 's2', amount: 50, note: 'Versement', date: iso(2) },
+          { id: 's3', amount: 100, note: 'Économie du mois', date: iso(6) },
+        ],
+        outings: [
+          { id: 'o2', amount: 34, label: 'Brunch', category: 'Resto', date: iso(1) },
+          { id: 'o3', amount: 48, label: 'Bar entre amis', category: 'Bar', date: iso(3) },
+          { id: 'o4', amount: 24, label: 'Cinéma', category: 'Culture', date: iso(5) },
+          { id: 'o5', amount: 62, label: 'Restaurant', category: 'Resto', date: iso(8) },
+        ],
+        envelope: 250,
+      },
+    };
+    state.lastOpened = now;
+    save();
+  }
+
   return {
-    // cycle de vie
-    load,
-    save,
-    rollover,
-    seed,
-    resetAll,
-    // dates
-    monthKey,
-    monthsBetween,
-    daysInMonth,
-    currentKey,
-    currentMonth,
-    // accès
-    getState,
-    // charges
-    totalCharges,
-    paidTotal,
-    unpaidTotal,
-    disponible,
-    chargesSorted,
-    lateCount,
-    togglePaid,
-    addCharge,
-    updateCharge,
-    removeCharge,
-    // épargne
-    savingsMonth,
-    savingsTotalAll,
-    savingsSeries,
-    addSaving,
-    removeSaving,
-    restoreSaving,
-    // sorties
-    outingsMonth,
-    outingsRemaining,
-    addOuting,
-    removeOuting,
-    restoreOuting,
-    // crédits
-    creditsRemainingTotal,
-    creditsMonthlyTotal,
-    creditMonthsLeft,
-    addCreditPayment,
-    updateCredit,
-    removeCredit,
-    // réglages / données
-    updateSettings,
-    setTheme,
-    exportJSON,
-    importJSON,
-    markExported,
-    snoozeBackup,
-    backupStatus,
+    load, save, rollover, seed, seedDemo, resetAll,
+    monthKey, monthsBetween, daysInMonth, addMonths, currentKey, currentMonth,
+    getState, CATEGORIES,
+    totalCharges, paidTotal, unpaidTotal, disponible, chargesSorted, lateCount, paidCount,
+    togglePaid, addCharge, updateCharge, removeCharge,
+    savingsMonth, savingsTotalAll, savingsSeries, savingsStreak,
+    addSaving, removeSaving, restoreSaving,
+    outingsMonth, outingsRemaining, outingsByCategory, forecast,
+    addOuting, removeOuting, restoreOuting,
+    creditsRemainingTotal, creditsMonthlyTotal, creditMonthsLeft, creditsPayoffKey,
+    addCredit, addCreditPayment, updateCredit, removeCredit,
+    updateSettings, exportJSON, importJSON, markExported, snoozeBackup, backupStatus,
   };
 })();
 
-// Rendu disponible aussi pour un import Node éventuel (tests).
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = Store;
 }

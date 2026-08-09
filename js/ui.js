@@ -1,59 +1,47 @@
 /*
- * ui.js — Tout ce qui touche à l'affichage « brut » :
+ * ui.js — Affichage « brut » d'Oboli (thème Nocturne).
  *   - formatage des montants et des dates,
- *   - toasts de confirmation,
- *   - feuilles modales qui montent du bas,
- *   - dessin des graphiques SVG (ruban du mois, courbe d'épargne).
+ *   - toasts, feuilles modales,
+ *   - dessin SVG : cadran du mois, jauge des sorties, courbe d'épargne,
+ *   - animations d'entrée (UI.activate) : cadran, jauges, compteurs, cascade.
  *
  * Ne connaît rien des règles métier : reçoit des nombres, rend du visuel.
  */
 
 const UI = (() => {
-  // Formateur d'euros à la belge (séparateur d'espace, virgule décimale).
   const euro = new Intl.NumberFormat('fr-BE', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    style: 'currency', currency: 'EUR',
+    minimumFractionDigits: 0, maximumFractionDigits: 2,
   });
 
-  // Formate un montant en euros. Ex : 1681 → « 1 681 € ».
-  function money(n) {
-    return euro.format(n || 0);
-  }
+  function money(n) { return euro.format(n || 0); }
 
-  // Comme money(), mais enveloppé pour l'animation de défilement des chiffres.
-  // Le texte rendu est déjà la valeur finale : si le JS d'animation ne tourne
-  // pas (ou animations réduites), le montant correct s'affiche quand même.
-  function countMoney(n) {
-    return `<span class="count" data-count-to="${n || 0}">${money(n)}</span>`;
-  }
+  const MONTHS_SHORT = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
 
-  // Mois abrégés en français, pour les axes du graphique d'épargne.
-  const MONTHS_SHORT = [
-    'janv', 'févr', 'mars', 'avr', 'mai', 'juin',
-    'juil', 'août', 'sept', 'oct', 'nov', 'déc',
-  ];
-
-  // « 2026-08 » → « août »
   function monthLabel(key) {
     const m = Number(key.split('-')[1]) - 1;
     return MONTHS_SHORT[m] || key;
   }
 
-  // Date ISO → « 9 août » (jour + mois court), pour les listes.
   function shortDate(iso) {
     const d = new Date(iso);
     return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
   }
 
+  function esc(str) {
+    return String(str).replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[ch]));
+  }
+
+  const reduced = () =>
+    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   /* ------------------------------------------------------------------ *
-   * Toast — petit bandeau de confirmation en bas
+   * Toast
    * ------------------------------------------------------------------ */
 
   let toastTimer = null;
-  // toast(message) simple, ou toast(message, { actionLabel, onAction }) avec
-  // un bouton (ex. « Annuler »). Le toast reste plus longtemps s'il a une action.
   function toast(message, opts = {}) {
     let el = document.getElementById('toast');
     if (!el) {
@@ -81,22 +69,20 @@ const UI = (() => {
       el.appendChild(btn);
     }
 
+    el.classList.remove('show');
+    // Force un reflow pour rejouer l'animation même sur toasts successifs.
+    void el.offsetWidth;
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(
-      () => el.classList.remove('show'),
-      opts.actionLabel ? 5000 : 2200
-    );
+    toastTimer = setTimeout(() => el.classList.remove('show'), opts.actionLabel ? 5000 : 2200);
   }
 
   /* ------------------------------------------------------------------ *
-   * Feuille modale — monte du bas, se ferme en tapant le fond
+   * Feuille modale
    * ------------------------------------------------------------------ */
 
-  // Ouvre une feuille. `title` = titre affiché, `bodyHtml` = contenu,
-  // `onMount` = callback(feuilleElement) pour brancher les événements.
   function openSheet(title, bodyHtml, onMount) {
-    closeSheet(); // une seule feuille à la fois
+    closeSheet();
 
     const overlay = document.createElement('div');
     overlay.className = 'sheet-overlay';
@@ -117,65 +103,20 @@ const UI = (() => {
     document.body.appendChild(overlay);
     document.body.classList.add('no-scroll');
 
-    // Fermeture en tapant le fond (mais pas la feuille elle-même).
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeSheet();
-    });
-
-    // Fermeture au clavier (Échap).
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeSheet(); });
     document.addEventListener('keydown', escToClose);
 
-    // Geste : tirer la feuille vers le bas pour la fermer. Le glissement ne part
-    // que de la zone du haut (poignée + titre, ~72 px) pour ne pas gêner le
-    // défilement du contenu. La feuille suit le doigt et retombe sous le seuil.
-    let startY = 0, dy = 0, dragging = false;
-    sheet.addEventListener('pointerdown', (e) => {
-      const rect = sheet.getBoundingClientRect();
-      if (e.clientY - rect.top > 72) return; // seulement le haut de la feuille
-      dragging = true; startY = e.clientY; dy = 0;
-      sheet.style.transition = 'none';
-      try { sheet.setPointerCapture(e.pointerId); } catch (_) {}
-    });
-    sheet.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
-      dy = Math.max(0, e.clientY - startY);
-      sheet.style.transform = `translateY(${dy}px)`;
-      overlay.style.background = `rgba(6, 9, 16, ${0.6 * (1 - Math.min(1, dy / 320))})`;
-      if (dy > 4) e.preventDefault();
-    });
-    const endDrag = () => {
-      if (!dragging) return;
-      dragging = false;
-      sheet.style.transition = ''; // rétablit la transition (ressort)
-      const threshold = Math.min(160, sheet.offsetHeight * 0.28);
-      if (dy > threshold) {
-        if (navigator.vibrate) { try { navigator.vibrate(10); } catch (_) {} }
-        overlay.style.background = '';   // laisse le CSS gérer le fondu du fond
-        sheet.style.transform = '';      // la règle de base (translateY 100%) reprend
-        closeSheet();
-      } else {
-        sheet.style.transform = '';      // retombe en place (ressort)
-        overlay.style.background = '';
-      }
-    };
-    sheet.addEventListener('pointerup', endDrag);
-    sheet.addEventListener('pointercancel', endDrag);
-
-    // Animation d'entrée au tour suivant, pour laisser le DOM se poser.
     requestAnimationFrame(() => overlay.classList.add('open'));
 
     if (typeof onMount === 'function') onMount(sheet);
 
-    // Focus sur le premier champ pour la saisie immédiate.
     const first = sheet.querySelector('input, textarea, select, button');
     if (first) first.focus();
 
     return sheet;
   }
 
-  function escToClose(e) {
-    if (e.key === 'Escape') closeSheet();
-  }
+  function escToClose(e) { if (e.key === 'Escape') closeSheet(); }
 
   function closeSheet() {
     const overlay = document.getElementById('sheet-overlay');
@@ -183,171 +124,202 @@ const UI = (() => {
     document.removeEventListener('keydown', escToClose);
     document.body.classList.remove('no-scroll');
     overlay.classList.remove('open');
-    // On retire après l'animation de sortie.
-    setTimeout(() => overlay.remove(), 200);
+    setTimeout(() => overlay.remove(), 300);
   }
 
   /* ------------------------------------------------------------------ *
-   * Ruban du mois — barre unique en trois segments (SVG dessiné main)
+   * Cadran du mois — trois arcs sur un même cercle
    * ------------------------------------------------------------------ */
 
-  // segments : { paid, unpaid, free } en euros. `income` = total (= somme).
-  // `dayRatio` ∈ [0,1] = position du jour courant dans le mois.
-  function ribbon({ paid, unpaid, free, income, dayRatio }) {
-    const W = 100; // largeur logique ; le SVG s'étire en 100 %.
-    const H = 18;
-    const r = H / 2;
+  // segments en euros ; income = total de référence.
+  function dial({ paid, unpaid, income, centerLabel, centerValue, centerSub }) {
+    const R = 88;
+    const C = 2 * Math.PI * R;           // circonférence ≈ 552.9
     const total = income > 0 ? income : 1;
 
-    // Largeurs proportionnelles au revenu.
-    let wPaid = (paid / total) * W;
-    let wUnpaid = (unpaid / total) * W;
-    // Garde-fou : si les charges dépassent le revenu, on rééchelonne les deux
-    // segments pour qu'ils ne débordent jamais de la barre.
-    if (wPaid + wUnpaid > W) {
-      const k = W / (wPaid + wUnpaid);
-      wPaid *= k;
-      wUnpaid *= k;
+    let pPaid = paid / total;
+    let pUnpaid = unpaid / total;
+    if (pPaid + pUnpaid > 1) {           // charges > revenu : on rééchelonne
+      const k = 1 / (pPaid + pUnpaid);
+      pPaid *= k; pUnpaid *= k;
     }
-    const wFree = Math.max(0, W - wPaid - wUnpaid);
+    const pFree = Math.max(0, 1 - pPaid - pUnpaid);
 
-    const xPaid = 0;
-    const xUnpaid = wPaid;
-    const xFree = wPaid + wUnpaid;
+    const gap = 4;                        // respiration entre les arcs
+    const len = (p) => Math.max(0, p * C - (p > 0.02 ? gap : 0));
+    const lPaid = len(pPaid);
+    const lUnpaid = len(pUnpaid);
+    const lFree = len(pFree);
 
-    const cursorX = Math.min(W, Math.max(0, dayRatio * W));
+    // dasharray posé après le premier rendu (UI.activate) → animation.
+    // Un segment de longueur nulle est omis : un linecap rond dessinerait un point.
+    const seg = (color, length, offset, extra = '') => length < 0.5 ? '' : `
+      <circle cx="110" cy="110" r="${R}" fill="none" stroke="${color}" stroke-width="16"
+        stroke-linecap="round" stroke-dasharray="0 ${C.toFixed(1)}"
+        stroke-dashoffset="${(-offset).toFixed(1)}"
+        data-dash="${length.toFixed(1)} ${(C - length).toFixed(1)}" ${extra}></circle>`;
 
-    // On dessine chaque segment comme un rectangle simple, puis on découpe
-    // l'ensemble avec un rectangle arrondi (clipPath) pour les bords ronds.
     return `
-      <svg class="ribbon" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
-           role="img" aria-label="Répartition du revenu : payé, à payer, libre">
-        <defs>
-          <clipPath id="ribbon-clip">
-            <rect x="0" y="0" width="${W}" height="${H}" rx="${r}" ry="${r}" />
-          </clipPath>
-          <pattern id="hatch" width="3" height="3" patternUnits="userSpaceOnUse"
-                   patternTransform="rotate(45)">
-            <rect width="3" height="3" fill="var(--amber-dim)"></rect>
-            <line x1="0" y1="0" x2="0" y2="3" stroke="var(--amber)" stroke-width="1.4"/>
-          </pattern>
-        </defs>
-        <g clip-path="url(#ribbon-clip)">
-          <rect class="seg seg-free" x="${xFree}" y="0" width="${wFree}" height="${H}" fill="var(--free)"/>
-          <rect class="seg seg-unpaid" x="${xUnpaid}" y="0" width="${wUnpaid}" height="${H}" fill="url(#hatch)"/>
-          <rect class="seg seg-paid" x="${xPaid}" y="0" width="${wPaid}" height="${H}" fill="var(--mint)"/>
-          <line class="cursor" x1="${cursorX}" y1="-1" x2="${cursorX}" y2="${H + 1}"
-                stroke="var(--text)" stroke-width="1.2" opacity="0.9"/>
-        </g>
-      </svg>
-    `;
+      <div class="dial-wrap">
+        <svg class="dial" viewBox="0 0 220 220" role="img"
+             aria-label="Répartition du revenu : payé, à payer, libre">
+          <circle cx="110" cy="110" r="${R}" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="16"/>
+          <defs>
+            <linearGradient id="dial-paid" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4FE3B0"/><stop offset="100%" stop-color="#3FC9E0"/>
+            </linearGradient>
+          </defs>
+          ${seg('url(#dial-paid)', lPaid, 0)}
+          ${seg('#F0B54A', lUnpaid, pPaid * C)}
+          ${seg('rgba(255,255,255,.14)', lFree, (pPaid + pUnpaid) * C)}
+        </svg>
+        <div class="dial-center">
+          <p class="eyebrow">${centerLabel}</p>
+          <p class="dial-value" data-count="${centerValue}">${money(centerValue)}</p>
+          <p class="subtle">${centerSub}</p>
+        </div>
+      </div>`;
   }
 
   /* ------------------------------------------------------------------ *
-   * Courbe d'épargne cumulée — aire dégradée, points, libellés de mois
+   * Jauge demi-cercle (sorties)
    * ------------------------------------------------------------------ */
 
-  // series : [{ key, cumulative }] triée. Rend un SVG responsive.
+  // ratio ∈ [0,1] = part consommée ; over = dépassement.
+  function gauge({ ratio, label, value, sub, over }) {
+    const ARC = 314;                       // longueur de l'arc dessiné
+    const filled = Math.max(0, Math.min(1, ratio)) * ARC;
+    const stroke = over ? '#FF6F5E' : 'url(#gauge-grad)';
+    return `
+      <div class="gauge-wrap">
+        <svg class="gauge" viewBox="0 0 240 136" role="img" aria-label="${label}">
+          <defs>
+            <linearGradient id="gauge-grad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#4FE3B0"/><stop offset="100%" stop-color="#F0B54A"/>
+            </linearGradient>
+          </defs>
+          <path d="M20 120 A100 100 0 0 1 220 120" fill="none" stroke="rgba(255,255,255,.06)"
+                stroke-width="16" stroke-linecap="round"/>
+          <path class="val" d="M20 120 A100 100 0 0 1 220 120" fill="none" stroke="${stroke}"
+                stroke-width="16" stroke-linecap="round"
+                stroke-dasharray="0 ${ARC}" data-dash="${filled.toFixed(1)} ${ARC}"/>
+        </svg>
+        <div class="gauge-center">
+          <p class="eyebrow">${label}</p>
+          <p class="gauge-value${over ? ' coral-t' : ''}" data-count="${value}">${money(value)}</p>
+          <p class="subtle">${sub}</p>
+        </div>
+      </div>`;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Courbe d'épargne cumulée
+   * ------------------------------------------------------------------ */
+
   function savingsChart(series) {
     if (!series.length) {
       return '<p class="empty">Aucun versement pour l’instant. La courbe apparaîtra dès le premier euro mis de côté.</p>';
     }
+    const pts = series.length === 1 ? [series[0], { ...series[0] }] : series;
 
-    // Si un seul point, on en fabrique un second identique pour tracer une ligne.
-    const pts = series.length === 1
-      ? [series[0], { ...series[0] }]
-      : series;
-
-    const W = 320;
-    const H = 160;
-    const padX = 14;   // marge latérale
-    const padTop = 16;
-    const padBottom = 26; // place pour les libellés de mois
-
+    const W = 320, H = 140, padX = 10, padTop = 14, padBottom = 16;
     const maxY = Math.max(...pts.map((p) => p.cumulative), 1);
     const innerW = W - padX * 2;
     const innerH = H - padTop - padBottom;
 
-    // Coordonnée X d'un point selon son index.
-    const xAt = (i) =>
-      padX + (pts.length === 1 ? innerW / 2 : (i / (pts.length - 1)) * innerW);
-    // Coordonnée Y d'une valeur cumulée (0 en bas, maxY en haut).
+    const xAt = (i) => padX + (i / (pts.length - 1)) * innerW;
     const yAt = (v) => padTop + innerH - (v / maxY) * innerH;
 
-    const linePoints = pts.map((p, i) => `${xAt(i)},${yAt(p.cumulative)}`);
-    const linePath = 'M' + linePoints.join(' L');
+    const linePath = 'M' + pts.map((p, i) => `${xAt(i).toFixed(1)},${yAt(p.cumulative).toFixed(1)}`).join(' L');
+    const areaPath = `${linePath} L${xAt(pts.length - 1).toFixed(1)},${(padTop + innerH).toFixed(1)} L${xAt(0).toFixed(1)},${(padTop + innerH).toFixed(1)} Z`;
+    const last = pts[pts.length - 1];
 
-    // Aire fermée sous la courbe (retour par le bas).
-    const areaPath =
-      linePath +
-      ` L${xAt(pts.length - 1)},${padTop + innerH}` +
-      ` L${xAt(0)},${padTop + innerH} Z`;
-
-    // Points sur chaque mois.
-    const dots = pts
-      .map((p, i) => `<circle class="dot-pt" cx="${xAt(i)}" cy="${yAt(p.cumulative)}" r="2.6" fill="var(--mint)"/>`)
-      .join('');
-
-    // Libellés de mois. Les extrémités sont ancrées start/end pour ne pas
-    // être rognées ; les intermédiaires restent centrés.
-    const labels = pts
-      .map((p, i) => {
-        let anchor = 'middle';
-        if (i === 0) anchor = 'start';
-        else if (i === pts.length - 1) anchor = 'end';
-        return `<text x="${xAt(i)}" y="${H - 8}" text-anchor="${anchor}"
-                   class="chart-label">${monthLabel(p.key)}</text>`;
-      })
-      .join('');
+    const labels = pts.map((p) => `<span>${monthLabel(p.key)}</span>`).join('');
 
     return `
-      <svg class="savings-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
+      <svg class="savings-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
            role="img" aria-label="Épargne cumulée mois après mois">
         <defs>
           <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="var(--mint)" stop-opacity="0.35"/>
-            <stop offset="100%" stop-color="var(--mint)" stop-opacity="0"/>
+            <stop offset="0%" stop-color="#4FE3B0" stop-opacity="0.38"/>
+            <stop offset="100%" stop-color="#4FE3B0" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="line-grad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#3FC9E0"/><stop offset="100%" stop-color="#4FE3B0"/>
           </linearGradient>
         </defs>
+        <line x1="0" y1="${padTop + innerH * 0.25}" x2="${W}" y2="${padTop + innerH * 0.25}" stroke="rgba(255,255,255,.05)"/>
+        <line x1="0" y1="${padTop + innerH * 0.62}" x2="${W}" y2="${padTop + innerH * 0.62}" stroke="rgba(255,255,255,.05)"/>
         <path class="area" d="${areaPath}" fill="url(#area-grad)"/>
-        <path class="line" d="${linePath}" fill="none" stroke="var(--mint)" stroke-width="2"
-              stroke-linejoin="round" stroke-linecap="round"/>
-        ${dots}
-        ${labels}
+        <path class="line" d="${linePath}" fill="none" stroke="url(#line-grad)" stroke-width="2.5"
+              stroke-linejoin="round" stroke-linecap="round" pathLength="1"/>
+        <circle cx="${xAt(pts.length - 1).toFixed(1)}" cy="${yAt(last.cumulative).toFixed(1)}" r="9" fill="#4FE3B0" opacity=".18"/>
+        <circle cx="${xAt(pts.length - 1).toFixed(1)}" cy="${yAt(last.cumulative).toFixed(1)}" r="4" fill="#4FE3B0"/>
       </svg>
-    `;
+      <div class="chart-months">${labels}</div>`;
   }
 
   /* ------------------------------------------------------------------ *
-   * Petite barre de progression réutilisable
+   * Barre de progression
    * ------------------------------------------------------------------ */
 
-  // ratio ∈ [0,1] ; `danger` force la couleur corail (dépassement).
   function bar(ratio, danger = false) {
     const pct = Math.max(0, Math.min(1, ratio)) * 100;
-    const cls = danger ? 'progress danger' : 'progress';
-    return `<div class="${cls}"><span style="width:${pct}%"></span></div>`;
+    return `<div class="progress${danger ? ' danger' : ''}"><span data-width="${pct.toFixed(1)}%"></span></div>`;
   }
 
-  // Échappe le texte utilisateur avant insertion dans le HTML.
-  function esc(str) {
-    return String(str).replace(/[&<>"']/g, (ch) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    }[ch]));
+  /* ------------------------------------------------------------------ *
+   * Animations d'entrée — à appeler après chaque rendu
+   * ------------------------------------------------------------------ */
+
+  function countUp(el, target) {
+    const dur = 700;
+    const start = performance.now();
+    const from = 0;
+    function frame(now) {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = money(from + (target - from) * eased);
+      if (t < 1) requestAnimationFrame(frame);
+      else el.textContent = money(target);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // Pose les valeurs finales (dasharray, largeurs) au tour suivant :
+  // le navigateur anime la transition depuis l'état initial à zéro.
+  function activate(root) {
+    if (!root) return;
+
+    // Cascade : index sur les enfants des piles.
+    root.querySelectorAll('.stagger').forEach((list) => {
+      [...list.children].forEach((child, i) => child.style.setProperty('--i', Math.min(i, 12)));
+    });
+
+    const paint = () => {
+      root.querySelectorAll('[data-dash]').forEach((el) => {
+        el.setAttribute('stroke-dasharray', el.dataset.dash);
+      });
+      root.querySelectorAll('.progress span[data-width], .cat-bar span[data-width]').forEach((el) => {
+        el.style.width = el.dataset.width;
+      });
+    };
+
+    if (reduced()) { paint(); return; }
+
+    requestAnimationFrame(() => requestAnimationFrame(paint));
+
+    root.querySelectorAll('[data-count]').forEach((el) => {
+      const target = parseFloat(el.dataset.count);
+      if (!isNaN(target)) countUp(el, target);
+    });
   }
 
   return {
-    money,
-    countMoney,
-    monthLabel,
-    shortDate,
-    toast,
-    openSheet,
-    closeSheet,
-    ribbon,
-    savingsChart,
-    bar,
-    esc,
+    money, monthLabel, shortDate, esc,
+    toast, openSheet, closeSheet,
+    dial, gauge, savingsChart, bar,
+    activate, countUp,
   };
 })();
 

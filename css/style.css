@@ -1,68 +1,45 @@
 /*
- * style.css — Tout le style d'Oboli.
- * Thème sombre par défaut, pensé pour la nuit : bleu d'encre, pas de noir pur.
- * Hiérarchie portée par la taille et le contraste, pas par les bordures.
+ * style.css — Oboli, thème « Nocturne ».
+ * Sombre uniquement : bleu nuit, verre, menthe → cyan.
+ * Hiérarchie portée par un objet fort par écran ; le reste s'efface.
  */
 
-/* ------------------------------------------------------------------ *
- * Variables — la palette
- * ------------------------------------------------------------------ */
 :root {
-  --bg: #0F1420;            /* fond, bleu d'encre profond */
-  --surface: #171E2E;      /* cartes */
-  --surface-2: #1F283B;    /* surfaces secondaires */
-  --line: #2A3549;         /* traits, rares */
+  color-scheme: dark;
 
-  --text: #E8ECF4;         /* texte principal */
-  --muted: #8593AC;        /* texte discret */
+  --bg: #0A0E17;
+  --bg-2: #070A11;
+  --glass: rgba(255, 255, 255, 0.045);
+  --glass-2: rgba(255, 255, 255, 0.065);
+  --line: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.12);
 
-  --mint: #5EE0B0;         /* argent gardé, actions positives */
-  --amber: #F5B944;        /* attention, à payer */
-  --amber-dim: #3a2f16;    /* fond du motif hachuré */
-  --coral: #FF7A6B;        /* dépassement, suppression */
-  --free: #232C40;         /* segment « libre » du ruban */
+  --text: #EDEFF4;
+  --text-2: #8A93A8;
+  --muted: #68738C;
 
+  --mint: #4FE3B0;
+  --cyan: #3FC9E0;
+  --amber: #F0B54A;
+  --coral: #FF6F5E;
+  --ink: #04201A;          /* texte sur menthe */
+
+  --radius-xl: 24px;
   --radius: 18px;
-  --radius-sm: 12px;
+  --radius-sm: 14px;
+  --radius-xs: 12px;
 
-  /* Piles de polices avec repli système : lisible même sans Google Fonts */
   --font-title: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
-  /* Zones sûres iOS */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 
-  /* Hauteur de la barre d'onglets, pour dégager le contenu au-dessus */
-  --tabbar-h: 64px;
-
-  /* --- Motion design : courbes et durées partagées --- *
-   * Une seule palette de mouvement pour toute l'app : cohérence garantie.
-   * --ease-out  : décélération naturelle (entrées, glissements).
-   * --ease-spring : léger rebond (coches, onglets, pastilles).                 */
-  /* --- Système de mouvement : 3 durées, point. --- */
-  --t-instant: 120ms;  /* retour au doigt : pression, coche, bascule d'état */
-  --t-base: 220ms;     /* la majorité : fondus, jauges, halos, contrôles */
-  --t-ample: 400ms;    /* changement de contexte : feuille modale */
-
-  /* Easings nommés : sortie (entrées), symétrique (transformations), ressort. */
-  --ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);    /* ce qui ENTRE : rapide puis décélère */
-  --ease-inout: cubic-bezier(0.4, 0, 0.2, 1);    /* ce qui se TRANSFORME : symétrique */
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);/* POIDS : feuille qui monte, relâché */
-
-  /* Alias rétro-compatibles (les anciennes règles pointent dessus). */
-  --dur-fast: var(--t-instant);
-  --dur: var(--t-base);
-  --dur-slow: var(--t-ample);
-  --ease-in: var(--ease-inout);  /* sorties : courbe symétrique, durée plus courte */
-  --ease-emph: var(--ease-out);
+  --tabbar-h: 66px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* ------------------------------------------------------------------ *
- * Base
- * ------------------------------------------------------------------ */
 * { box-sizing: border-box; }
-
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -71,930 +48,456 @@ body {
   color: var(--text);
   font-family: var(--font-body);
   font-size: 16px;
-  line-height: 1.4;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
-  /* Évite tout débordement horizontal, même sur petit écran */
   overflow-x: hidden;
 }
-
 body.no-scroll { overflow: hidden; }
 
-/* Halo menthe ambiant en haut de l'écran : donne de la profondeur, discret.
-   Fixe et non interactif, il ne provoque aucun débordement. */
+/* Halo ambiant : profondeur, fixe et non interactif. */
 body::before {
   content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: -1;
   background:
-    radial-gradient(130% 55% at 50% -12%, rgba(94, 224, 176, 0.10), transparent 62%),
-    radial-gradient(90% 40% at 100% 0%, rgba(245, 185, 68, 0.05), transparent 55%);
-  /* Le halo « respire » très lentement et discrètement : vivant, jamais tape-à-l'œil. */
-  animation: ambientDrift 26s ease-in-out infinite alternate;
-}
-@keyframes ambientDrift {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(0, -7px, 0) scale(1.025); }
+    radial-gradient(80% 42% at 50% -4%, rgba(79, 224, 176, 0.18), transparent 70%),
+    radial-gradient(60% 32% at 100% 12%, rgba(63, 201, 224, 0.10), transparent 70%);
 }
 
-h1, h2 { font-family: var(--font-title); font-weight: 600; margin: 0; }
-h1 { font-size: 1.4rem; }
-h2 { font-size: 1.05rem; }
+h1, h2 { font-family: var(--font-title); font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 1.38rem; }
+h2 { font-size: 1rem; }
 
 button { font-family: inherit; cursor: pointer; }
+button:active { transform: scale(0.975); }
+button { transition: transform 0.12s var(--ease), background 0.18s ease, color 0.18s ease; }
 
-/* Tous les montants : chiffres tabulaires, police de titre */
 .figure, .figure-sm, .figure-xs, .row-amount, .credit-remaining,
-.mini-credit-info, .ribbon-legend b {
+.mini-credit-info, .dial-value, .gauge-value, .legend b, .stat-value {
   font-family: var(--font-title);
   font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------------ *
- * Écran d'ouverture (splash) — animation de lancement
- * ------------------------------------------------------------------ */
-#splash {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  display: grid;
-  place-items: center;
-  background: var(--bg);
-  transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out);
-}
-/* Halo menthe qui pulse doucement en fond. */
-#splash::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(120% 60% at 50% 42%, rgba(94, 224, 176, 0.16), transparent 60%);
-  animation: splashHalo 1.6s ease-in-out infinite alternate;
-}
-/* État de sortie : le voile se lève. */
-#splash.gone { opacity: 0; transform: scale(1.04); pointer-events: none; }
-
-.splash-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  position: relative;
-}
-.splash-logo {
-  width: 96px; height: 96px;
-  border-radius: 26px;
-  background: linear-gradient(145deg, #6ff0c2, #38c99a);
-  display: grid; place-items: center;
-  box-shadow: 0 20px 50px rgba(56, 201, 154, 0.35);
-  position: relative;
-  overflow: hidden;
-  animation: splashPop 0.7s var(--ease-spring) both;
-}
-/* Reflet qui balaie le logo. */
-.splash-logo::after {
-  content: '';
-  position: absolute;
-  top: 0; left: -60%;
-  width: 55%; height: 100%;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
-  transform: skewX(-18deg);
-  animation: splashSheen 1.1s var(--ease-out) 0.5s both;
-}
-.splash-logo svg { width: 52px; height: 52px; }
-/* Les barres montent une à une (échelle verticale depuis le bas). */
-.sbar { transform-box: fill-box; transform-origin: bottom center; animation: barRise 0.5s var(--ease-out) both; }
-.sbar-1 { animation-delay: 0.34s; }
-.sbar-2 { animation-delay: 0.46s; }
-.sbar-3 { animation-delay: 0.58s; }
-.splash-name {
-  font-family: var(--font-title);
-  font-weight: 700;
-  font-size: 2rem;
-  letter-spacing: 0.01em;
-  color: var(--text);
-  opacity: 0;
-  animation: splashName 0.6s var(--ease-out) 0.55s forwards;
-}
-@keyframes splashPop { from { opacity: 0; transform: scale(0.5) rotate(-8deg); } to { opacity: 1; transform: none; } }
-@keyframes barRise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-@keyframes splashName { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@keyframes splashSheen { from { left: -60%; } to { left: 135%; } }
-@keyframes splashHalo { from { opacity: 0.55; } to { opacity: 1; } }
-
-/* ------------------------------------------------------------------ *
  * Zone applicative & vues
  * ------------------------------------------------------------------ */
 #app {
-  padding: calc(var(--safe-top) + 8px) 16px calc(var(--tabbar-h) + var(--safe-bottom) + 20px);
+  padding: calc(var(--safe-top) + 10px) 20px calc(var(--tabbar-h) + var(--safe-bottom) + 44px);
   max-width: 560px;
   margin: 0 auto;
 }
-
 .view { display: none; }
-.view.active { display: block; }
+.view.active { display: block; animation: view-in 0.32s var(--ease) both; }
 
-/* Cascade d'entrée : quand on arrive sur une vue (navigation), ses blocs
-   directs montent et apparaissent l'un après l'autre. Déclenchée par la classe
-   .enter posée en JS uniquement sur la navigation — pas sur un simple rafraîchi,
-   pour garder les interactions instantanées. */
-.view.active.enter > * {
-  animation: blockIn var(--dur-slow) var(--ease-out) backwards;
-}
-.view.active.enter > *:nth-child(1) { animation-delay: 0.02s; }
-.view.active.enter > *:nth-child(2) { animation-delay: 0.07s; }
-.view.active.enter > *:nth-child(3) { animation-delay: 0.12s; }
-.view.active.enter > *:nth-child(4) { animation-delay: 0.17s; }
-.view.active.enter > *:nth-child(5) { animation-delay: 0.22s; }
-.view.active.enter > *:nth-child(6) { animation-delay: 0.27s; }
-.view.active.enter > *:nth-child(7) { animation-delay: 0.32s; }
-.view.active.enter > *:nth-child(8) { animation-delay: 0.37s; }
-.view.active.enter > *:nth-child(n+9) { animation-delay: 0.42s; }
+@keyframes view-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes sheet-up { from { transform: translateY(102%); } to { transform: translateY(0); } }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 16px) scale(0.96); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
 
-@keyframes blockIn {
-  from { opacity: 0; transform: translateY(16px) scale(0.985); }
-  to   { opacity: 1; transform: none; }
-}
+/* Apparition en cascade des enfants d'une pile. */
+.stagger > * { animation: rise 0.42s var(--ease) both; animation-delay: calc(var(--i, 0) * 45ms); }
 
-/* Les lignes de liste entrent aussi, en léger décalage sous leur carte. */
-.view.active.enter .list .row {
-  animation: rowIn var(--dur) var(--ease-out) backwards;
-}
-.view.active.enter .list .row:nth-child(1) { animation-delay: 0.18s; }
-.view.active.enter .list .row:nth-child(2) { animation-delay: 0.23s; }
-.view.active.enter .list .row:nth-child(3) { animation-delay: 0.28s; }
-.view.active.enter .list .row:nth-child(4) { animation-delay: 0.33s; }
-.view.active.enter .list .row:nth-child(5) { animation-delay: 0.38s; }
-.view.active.enter .list .row:nth-child(n+6) { animation-delay: 0.43s; }
-
-@keyframes rowIn {
-  from { opacity: 0; transform: translateX(-10px); }
-  to   { opacity: 1; transform: none; }
-}
-
-/* Sortie d'une ligne supprimée : elle se replie proprement avant le rafraîchi. */
-.row.removing {
-  animation: rowOut var(--t-base) var(--ease-inout) forwards;
-  overflow: hidden;
-}
-@keyframes rowOut {
-  from { opacity: 1; transform: none; max-height: 80px; }
-  to   { opacity: 0; transform: translateX(24px); max-height: 0;
-         padding-top: 0; padding-bottom: 0; margin: 0; border: 0; }
-}
-
-/* Quand on est dans une sous-vue (historique / réglages), on masque la barre */
 body.subview .tabbar { display: none; }
-body.subview #app { padding-bottom: calc(var(--safe-bottom) + 24px); }
+body.subview #app { padding-bottom: calc(var(--safe-bottom) + 28px); }
 
 /* ------------------------------------------------------------------ *
  * En-têtes
  * ------------------------------------------------------------------ */
 .home-header, .sub-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 6px 0 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin: 4px 0 18px;
 }
 .sub-header h1 { flex: 1; }
 .sub-header > div { min-width: 40px; display: flex; justify-content: flex-end; }
 
 .eyebrow {
   margin: 0 0 4px;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 0.69rem; text-transform: uppercase; letter-spacing: 0.16em;
   color: var(--muted);
 }
-.home-month { font-size: 1.5rem; }
+.home-month { font-size: 1.38rem; }
 .home-actions { display: flex; gap: 8px; }
 
-/* Ligne de marque en tête de l'accueil : petit logo + « Oboli ». */
-.brand-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 2px 0 12px;
-}
-.brand-logo {
-  width: 28px; height: 28px;
-  border-radius: 9px;
-  background: linear-gradient(145deg, #6ff0c2, #38c99a);
-  display: grid; place-items: center;
-  box-shadow: 0 3px 10px rgba(56, 201, 154, 0.30);
-  flex: none;
-}
-.brand-logo svg { width: 16px; height: 16px; display: block; }
-.brand-name {
-  font-family: var(--font-title);
-  font-weight: 700;
-  font-size: 1.1rem;
-  letter-spacing: 0.01em;
-  color: var(--text);
-}
-
 .icon-btn {
-  width: 40px; height: 40px;
+  width: 38px; height: 38px;
   display: grid; place-items: center;
-  background: var(--surface);
-  border: none; border-radius: 12px;
-  color: var(--text);
+  background: var(--glass); border: 1px solid var(--line);
+  border-radius: var(--radius-xs); color: #C3CBDA;
 }
-.icon-btn svg { width: 20px; height: 20px; transition: transform var(--dur) var(--ease-spring); }
-.icon-btn { transition: transform var(--dur-fast) var(--ease-spring), background var(--dur-fast) ease; }
-.icon-btn:active { transform: scale(0.9); }
-.icon-btn:active svg { transform: rotate(-12deg); }
+.icon-btn svg { width: 18px; height: 18px; }
 
 /* ------------------------------------------------------------------ *
- * Cartes
+ * Cartes de verre
  * ------------------------------------------------------------------ */
 .card {
-  background: var(--surface);
-  border-radius: var(--radius);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
   padding: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
-.card-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-bottom: 10px;
-}
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.grid-2 .card { margin-bottom: 14px; }
+.card.raised { background: linear-gradient(155deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); }
+.card.mint { background: linear-gradient(155deg, rgba(79,227,176,0.20), rgba(63,201,224,0.05)); border-color: rgba(79,227,176,0.20); }
+.card > h2 { margin-bottom: 12px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-2 .card { margin-bottom: 12px; }
 
-/* Grands chiffres */
-.figure { font-size: 2.4rem; font-weight: 700; margin: 2px 0; letter-spacing: -0.02em; }
-.figure-sm { font-size: 1.5rem; font-weight: 600; margin: 2px 0; }
-.figure-xs { font-size: 1.2rem; font-weight: 600; margin: 2px 0; }
-.big-figure .figure { line-height: 1.1; }
+.figure { font-size: 2.3rem; font-weight: 700; margin: 2px 0; letter-spacing: -0.03em; line-height: 1.05; }
+.figure-sm { font-size: 1.45rem; font-weight: 700; margin: 2px 0; }
+.figure-xs { font-size: 1.2rem; font-weight: 700; margin: 2px 0; }
 
-.subtle { color: var(--muted); font-size: 0.85rem; margin: 4px 0 0; }
-.subtle.tiny { font-size: 0.78rem; }
+.subtle { color: var(--text-2); font-size: 0.83rem; margin: 6px 0 0; }
+.subtle.tiny { font-size: 0.76rem; color: var(--muted); }
 .subtle.warn { color: var(--coral); }
 
-/* Couleurs d'accent réutilisables */
-.mint { color: var(--mint); }
-.amber { color: var(--amber); }
-.coral { color: var(--coral); }
-.neg { color: var(--coral); }
+.mint-t { color: var(--mint); }
+.amber-t { color: var(--amber); }
+.coral-t, .neg { color: var(--coral); }
 
 /* ------------------------------------------------------------------ *
- * Ruban du mois
+ * Cadran du mois (accueil)
  * ------------------------------------------------------------------ */
-.ribbon-card { padding-top: 18px; }
-.ribbon {
-  width: 100%;
-  height: 40px;
-  display: block;
-}
-.ribbon-legend {
-  display: flex; flex-wrap: wrap; gap: 10px 16px;
-  margin-top: 12px;
-  font-size: 0.85rem; color: var(--muted);
-}
-.ribbon-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.ribbon-legend b { color: var(--text); font-weight: 600; }
-.dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.dial-card { padding: 8px 16px 18px; }
+.dial-wrap { position: relative; display: grid; place-items: center; }
+.dial { width: 224px; height: 224px; display: block; transform: rotate(-90deg); }
+.dial circle { transition: stroke-dasharray 0.9s var(--ease); }
+.dial-center { position: absolute; text-align: center; }
+.dial-value { font-size: 2.6rem; font-weight: 700; letter-spacing: -0.03em; margin: 0; line-height: 1; }
+
+.legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; font-size: 0.78rem; color: var(--text-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend b { color: var(--text); font-weight: 700; }
+.dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
 .dot.mint { background: var(--mint); }
 .dot.amber { background: var(--amber); }
-.dot.free { background: var(--free); }
+.dot.free { background: rgba(255, 255, 255, 0.16); }
+
+/* Jauge demi-cercle (sorties) */
+.gauge-wrap { position: relative; display: grid; place-items: center; padding: 4px 0 0; }
+.gauge { width: 290px; max-width: 100%; height: auto; display: block; }
+.gauge path.val { transition: stroke-dasharray 0.9s var(--ease); }
+.gauge-center { position: absolute; bottom: 10px; text-align: center; }
+.gauge-value { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.03em; margin: 0; line-height: 1; }
+
+/* ------------------------------------------------------------------ *
+ * Actions rapides
+ * ------------------------------------------------------------------ */
+.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.quick button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 12px; border-radius: var(--radius);
+  background: var(--glass); border: 1px solid var(--line);
+  color: var(--text); font-size: 0.78rem; font-weight: 700; text-align: left;
+}
+.quick svg { width: 17px; height: 17px; stroke: var(--mint); }
 
 /* ------------------------------------------------------------------ *
  * Barres de progression
  * ------------------------------------------------------------------ */
-.progress {
-  height: 8px;
-  background: var(--surface-2);
-  border-radius: 999px;
-  overflow: hidden;
-  margin-top: 10px;
-}
-.progress span {
-  display: block; height: 100%;
-  background: var(--mint);
-  border-radius: 999px;
-  transition: width var(--t-base) var(--ease-out);
-  /* Remplissage animé depuis 0 à l'apparition (la largeur cible reste en ligne). */
-  animation: barGrow var(--dur-slow) var(--ease-out) backwards;
-}
-@keyframes barGrow { from { width: 0; } }
-.progress.danger span { background: var(--coral); }
+.progress { height: 6px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; margin-top: 10px; }
+.progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--mint)); border-radius: 999px; transition: width 0.8s var(--ease); }
+.progress.danger span { background: linear-gradient(90deg, var(--amber), var(--coral)); }
+
+.split { display: flex; gap: 3px; height: 8px; }
+.split i { display: block; border-radius: 999px; transition: flex-grow 0.8s var(--ease); }
+.split i.paid { background: linear-gradient(90deg, var(--cyan), var(--mint)); }
+.split i.unpaid { background: var(--amber); }
+.split i.rest { background: rgba(255,255,255,0.16); }
 
 /* ------------------------------------------------------------------ *
- * Bandeaux récapitulatifs (Factures, Crédits)
+ * Bandeaux récapitulatifs
  * ------------------------------------------------------------------ */
 .summary-3, .summary-2 { display: grid; text-align: center; gap: 8px; }
 .summary-3 { grid-template-columns: repeat(3, 1fr); }
 .summary-2 { grid-template-columns: repeat(2, 1fr); }
 
 /* ------------------------------------------------------------------ *
- * Listes (lignes de factures, versements, sorties)
+ * Listes en cartes
  * ------------------------------------------------------------------ */
-.list { list-style: none; margin: 0; padding: 0; }
-.list.compact .row { padding: 8px 0; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 
 .row {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
+  padding: 12px 14px;
+  background: var(--glass); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--radius);
 }
-.row:last-child { border-bottom: none; }
-
-/* Lignes « balayables » (suppression par glissement).
-   Le contenu glisse et révèle un fond coral « Supprimer » en dessous. */
-.list .row { position: relative; overflow: hidden; }
-.row-content {
-  display: flex; align-items: center; gap: 12px;
-  width: 100%;
-  background: var(--surface); /* masque le fond coral au repos */
-  /* Le navigateur gère le défilement vertical ; l'horizontal nous revient. */
-  touch-action: pan-y;
-}
-.row-behind {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: flex-end;
-  padding-right: 20px;
-  background: var(--coral); color: #2A0B07;
-  font-weight: 600; font-size: 0.9rem;
-  opacity: 0;
-}
+.row.warn { border-color: rgba(240, 181, 74, 0.24); background: var(--glass-2); }
 
 .row-main {
   flex: 1; min-width: 0;
-  display: flex; flex-direction: column; gap: 2px;
+  display: flex; flex-direction: column; gap: 1px;
   background: none; border: none; padding: 0; text-align: left; color: inherit;
 }
 .row-main.tap { cursor: pointer; }
-.row-name {
-  font-weight: 500;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.row-name { font-weight: 600; font-size: 0.91rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub { font-size: 0.75rem; color: var(--muted); }
+.row-amount { font-weight: 700; white-space: nowrap; }
+
+.row.charge.done .row-name { text-decoration: line-through; color: var(--muted); }
+.row.charge.done .row-amount { color: var(--muted); }
+
+.day-chip {
+  flex: none; width: 34px; height: 34px; border-radius: 11px;
+  background: rgba(255,255,255,0.07); color: var(--text-2);
+  display: grid; place-items: center;
+  font-family: var(--font-title); font-size: 0.78rem; font-weight: 700;
 }
-.row-sub { font-size: 0.8rem; color: var(--muted); }
-.row-amount { font-weight: 600; white-space: nowrap; }
+.day-chip.late { background: rgba(255, 111, 94, 0.16); color: var(--coral); }
+.day-chip.soon { background: rgba(240, 181, 74, 0.16); color: var(--amber); }
+.day-chip svg { width: 15px; height: 15px; stroke: var(--mint); }
 
-/* Facture cochée : barrée et grisée */
-.row.charge.done .row-name,
-.row.charge.done .row-amount { text-decoration: line-through; color: var(--muted); }
-
-/* Case à cocher personnalisée */
 .check {
-  flex: none;
-  width: 26px; height: 26px;
-  border-radius: 8px;
-  border: 2px solid var(--line);
-  background: transparent;
-  display: grid; place-items: center;
-  color: var(--bg);
-  padding: 0;
+  flex: none; width: 26px; height: 26px;
+  border-radius: 9px; border: 1.5px solid #3A4457;
+  background: transparent; display: grid; place-items: center;
+  color: var(--ink); padding: 0;
+  transition: background 0.2s var(--ease), border-color 0.2s var(--ease), transform 0.12s var(--ease);
 }
-.check { transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-spring); }
-.check:active { transform: scale(0.88); }
-.check.on { background: var(--mint); border-color: var(--mint); animation: checkPop var(--dur) var(--ease-spring); }
-.check svg { width: 16px; height: 16px; }
-/* Le ✓ se dessine d'un trait à la validation. */
-.check.on svg path {
-  stroke-dasharray: 24;
-  stroke-dashoffset: 24;
-  animation: checkDraw var(--dur) var(--ease-out) forwards;
-}
-@keyframes checkPop {
-  0%   { transform: scale(0.6); }
-  55%  { transform: scale(1.12); }
-  100% { transform: scale(1); }
-}
-@keyframes checkDraw { to { stroke-dashoffset: 0; } }
+.check.on { background: var(--mint); border-color: var(--mint); animation: pop-in 0.24s var(--ease); }
+.check svg { width: 15px; height: 15px; }
 
-/* Corbeille */
 .trash {
-  flex: none;
-  width: 34px; height: 34px;
+  flex: none; width: 32px; height: 32px;
   display: grid; place-items: center;
-  background: transparent; border: none;
-  color: var(--muted); border-radius: 8px;
+  background: transparent; border: none; color: var(--muted); border-radius: 9px;
 }
-.trash svg { width: 17px; height: 17px; }
-.trash { transition: color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-spring); }
-.trash:active { color: var(--coral); transform: scale(0.8) rotate(-8deg); }
+.trash svg { width: 16px; height: 16px; }
+.trash:active { color: var(--coral); }
+
+/* Catégories */
+.cats { display: flex; flex-direction: column; gap: 9px; }
+.cat-row { display: flex; align-items: center; gap: 10px; }
+.cat-name { width: 74px; flex: none; font-size: 0.8rem; color: var(--text-2); }
+.cat-bar { flex: 1; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.07); overflow: hidden; }
+.cat-bar span { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--cyan), var(--mint)); transition: width 0.8s var(--ease); }
+.cat-amount { font-family: var(--font-title); font-variant-numeric: tabular-nums; font-size: 0.8rem; width: 52px; text-align: right; }
 
 /* ------------------------------------------------------------------ *
- * Badges
+ * Badges & bandeaux
  * ------------------------------------------------------------------ */
 .badge {
   display: inline-block;
-  font-size: 0.68rem; font-weight: 600;
-  padding: 2px 7px; border-radius: 999px;
-  vertical-align: middle;
+  font-size: 0.63rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 999px;
 }
-.badge.late { background: rgba(255, 122, 107, 0.18); color: var(--coral); }
-.badge.ok { background: rgba(94, 224, 176, 0.18); color: var(--mint); }
+.badge.late { background: rgba(255, 111, 94, 0.16); color: var(--coral); }
+.badge.ok { background: rgba(79, 227, 176, 0.16); color: var(--mint); }
+.badge.warn { background: rgba(240, 181, 74, 0.16); color: var(--amber); }
 
-/* ------------------------------------------------------------------ *
- * Bandeaux de rappel (accueil) : en retard, sauvegarde
- * ------------------------------------------------------------------ */
 .alert {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  text-align: left;
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 12px;
-  font-size: 0.9rem; font-weight: 500;
-  border: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; text-align: left;
+  padding: 13px 16px; border-radius: var(--radius);
+  margin-bottom: 10px;
+  font-size: 0.88rem; font-weight: 600;
+  border: 1px solid transparent;
+  animation: rise 0.4s var(--ease) both;
 }
-.alert.late {
-  background: rgba(255, 122, 107, 0.14);
-  color: var(--coral);
-}
-.alert.late .alert-cta { font-weight: 600; white-space: nowrap; }
-.alert.backup {
-  background: rgba(245, 185, 68, 0.12);
-  color: var(--amber);
-  flex-wrap: wrap;
-}
-.alert.backup span:first-child { flex: 1; min-width: 60%; color: var(--text); }
-.alert.welcome {
-  background: rgba(94, 224, 176, 0.12);
-  color: var(--text);
-  flex-wrap: wrap;
-}
-.alert.welcome span:first-child { flex: 1; min-width: 60%; }
+.alert.late { background: rgba(255, 111, 94, 0.12); border-color: rgba(255, 111, 94, 0.26); color: var(--coral); }
+.alert.late .alert-cta { white-space: nowrap; }
+.alert.late .dot-live { width: 7px; height: 7px; border-radius: 999px; background: var(--coral); display: inline-block; margin-right: 8px; animation: breathe 1.8s ease-in-out infinite; }
+.alert.backup { background: rgba(240, 181, 74, 0.10); border-color: rgba(240, 181, 74, 0.22); color: var(--amber); flex-wrap: wrap; }
+.alert.backup span:first-child { flex: 1; min-width: 60%; color: var(--text); font-weight: 500; }
+.alert.welcome { background: rgba(79, 227, 176, 0.10); border-color: rgba(79, 227, 176, 0.22); color: var(--text); flex-wrap: wrap; }
+.alert.welcome span:first-child { flex: 1; min-width: 60%; font-weight: 500; }
 .alert-actions { display: flex; gap: 10px; }
 .link.muted { color: var(--muted); }
 
-/* ------------------------------------------------------------------ *
- * Bandeau « nouvelle version disponible »
- * ------------------------------------------------------------------ */
 .update-banner {
-  position: fixed;
-  left: 12px; right: 12px;
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 12px);
-  max-width: 536px; margin: 0 auto;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px;
-  background: var(--surface-2);
-  color: var(--text);
-  padding: 12px 12px 12px 18px;
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  position: fixed; left: 14px; right: 14px;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 22px);
+  max-width: 532px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: #131A28; color: var(--text);
+  border: 1px solid var(--line);
+  padding: 12px 12px 12px 18px; border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
   z-index: 150;
   transform: translateY(20px); opacity: 0;
-  transition: opacity var(--t-base) ease, transform var(--t-base) var(--ease-out);
-  font-size: 0.92rem; font-weight: 500;
+  transition: opacity 0.22s ease, transform 0.28s var(--ease);
+  font-size: 0.9rem; font-weight: 600;
 }
 .update-banner.show { transform: translateY(0); opacity: 1; }
-.update-banner .btn.small { flex: none; }
 
 /* ------------------------------------------------------------------ *
  * Écrans vides
  * ------------------------------------------------------------------ */
-.empty {
-  color: var(--muted);
-  font-size: 0.9rem;
-  text-align: center;
-  padding: 18px 8px;
-  margin: 0;
-}
-p.empty.card { padding: 28px 16px; }
-
-/* Numéro de version en pied des Réglages. */
-.app-version { text-align: center; margin: 18px 0 4px; opacity: 0.7; }
-
-/* Ligne d'état de l'import (visible à chaque étape). */
-.import-status {
-  text-align: center;
-  margin-top: 10px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-}
-.import-status.warn { color: var(--coral); }
+.empty { color: var(--muted); font-size: 0.88rem; text-align: center; padding: 20px 8px; margin: 0; text-wrap: pretty; }
+p.empty.card { padding: 30px 18px; }
 
 /* ------------------------------------------------------------------ *
- * Épargne
+ * Graphique d'épargne
  * ------------------------------------------------------------------ */
-.savings-hero {
-  background: linear-gradient(135deg, rgba(94, 224, 176, 0.22), rgba(94, 224, 176, 0.05));
-}
 .savings-chart { width: 100%; height: auto; display: block; margin-top: 6px; }
+.savings-chart .line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.1s var(--ease) 0.1s forwards; }
+.savings-chart .area { opacity: 0; animation: rise 0.6s ease 0.5s forwards; }
 .chart-label { fill: var(--muted); font-size: 8px; font-family: var(--font-body); }
+.chart-months { display: flex; justify-content: space-between; font-size: 0.66rem; color: var(--muted); padding: 0 4px; }
 
-/* ------------------------------------------------------------------ *
- * Sorties
- * ------------------------------------------------------------------ */
-.outings-hero.over { background: linear-gradient(135deg, rgba(255, 122, 107, 0.18), rgba(255, 122, 107, 0.04)); }
+/* Barres de l'historique */
+.month-bars { display: flex; align-items: flex-end; gap: 10px; height: 96px; }
+.month-bars > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.month-bars i { display: block; width: 100%; background: rgba(255,255,255,0.12); border-radius: 8px 8px 3px 3px; animation: grow 0.6s var(--ease) both; transform-origin: bottom; }
+.month-bars i.now { background: linear-gradient(180deg, var(--mint), var(--cyan)); }
+.month-bars small { font-size: 0.66rem; color: var(--muted); }
+.month-bars small.now { color: var(--mint); font-weight: 700; }
+@keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
 /* ------------------------------------------------------------------ *
  * Crédits
  * ------------------------------------------------------------------ */
-.credit-remaining { font-size: 1.6rem; font-weight: 700; margin: 6px 0 2px; }
-.credit-remaining .subtle { font-size: 0.85rem; font-weight: 400; }
-.credit-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.credit-remaining { font-size: 1.65rem; font-weight: 700; margin: 4px 0 0; }
+.credit-remaining .subtle { font-size: 0.82rem; font-weight: 500; display: inline; }
+.credit-meta { display: flex; justify-content: space-between; font-size: 0.76rem; color: var(--muted); margin-top: 8px; }
+.credit-actions { display: flex; gap: 8px; margin-top: 14px; }
+.credit-actions .btn { flex: 1; }
+.credit-actions .btn.ghost { flex: none; }
 
 .mini-credits { display: flex; flex-direction: column; gap: 10px; }
 .mini-credit { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.mini-credit-name { color: var(--text); }
-.mini-credit-info { color: var(--muted); font-size: 0.9rem; }
-
-/* ------------------------------------------------------------------ *
- * Historique
- * ------------------------------------------------------------------ */
-.history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mini-credit-info { color: var(--muted); font-size: 0.85rem; }
 
 /* ------------------------------------------------------------------ *
  * Boutons
  * ------------------------------------------------------------------ */
 .btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  gap: 6px;
-  background: var(--mint);
-  color: #06231A;
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: 13px 16px;
-  font-size: 1rem; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--mint); color: var(--ink);
+  border: none; border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 0.98rem; font-weight: 700;
   width: 100%;
 }
-.btn.small { width: auto; padding: 8px 12px; font-size: 0.9rem; }
-.btn.ghost { background: var(--surface-2); color: var(--text); }
-.btn.danger { background: var(--coral); color: #2A0B07; }
-.btn.ghost.danger { background: transparent; color: var(--coral); border: 1px solid var(--coral); }
-.btn { transition: transform var(--dur-fast) var(--ease-spring), filter var(--dur-fast) ease, box-shadow var(--dur) ease; }
-.btn:not(.ghost):not(.danger) { box-shadow: 0 6px 18px rgba(94, 224, 176, 0.18); }
-.btn:active { transform: scale(0.96); filter: brightness(0.97); }
+.btn.small { width: auto; padding: 9px 14px; font-size: 0.84rem; }
+.btn svg { width: 17px; height: 17px; }
+.btn.ghost { background: var(--glass-2); color: #C3CBDA; border: 1px solid var(--line); }
+.btn.soft { background: rgba(79,227,176,0.14); color: var(--mint); border: 1px solid rgba(79,227,176,0.24); }
+.btn.danger { background: transparent; color: var(--coral); border: 1px solid rgba(255,111,94,0.5); }
 
 .btn-row { display: flex; gap: 10px; margin-top: 12px; }
 .btn-row .btn { width: 100%; }
 
-/* Bouton d'import fichier : l'input transparent couvre tout le bouton, pour
-   ouvrir le sélecteur de façon fiable au tap (Android/iOS). */
-.file-btn { position: relative; overflow: hidden; }
-.file-input {
-  position: absolute;
-  inset: 0;
-  width: 100%; height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  font-size: 0; /* évite tout débordement du widget natif */
-}
+.link { background: none; border: none; color: var(--mint); font-size: 0.85rem; font-weight: 700; padding: 4px; }
 
-.link {
-  background: none; border: none; color: var(--mint);
-  font-size: 0.9rem; font-weight: 500; padding: 4px;
-  transition: opacity var(--t-instant) ease;
+/* Pastilles de montants rapides & catégories (feuilles) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.chip {
+  padding: 9px 14px; border-radius: 999px;
+  background: var(--glass); border: 1px solid var(--line);
+  color: var(--text-2); font-size: 0.8rem; font-weight: 600;
 }
+.chip.on { background: rgba(79,227,176,0.16); border-color: rgba(79,227,176,0.3); color: var(--mint); }
 
 /* ------------------------------------------------------------------ *
- * États de pression universels — tout ce qui est tapable réagit au doigt,
- * dans les ~120 ms, avant même que le résultat soit calculé.
- * (transform / opacity uniquement : aucun décalage de mise en page.)
+ * Champs
  * ------------------------------------------------------------------ */
-.row-main.tap { transition: transform var(--t-instant) var(--ease-out), opacity var(--t-instant) ease; }
-.row-main.tap:active { transform: scale(0.985); opacity: 0.7; }
-.link:active { opacity: 0.5; }
-.alert { transition: transform var(--t-instant) var(--ease-out), filter var(--t-instant) ease; }
-.alert.late:active,
-.alert.welcome:active,
-.alert.backup:active { transform: scale(0.99); filter: brightness(0.96); }
-
-/* ------------------------------------------------------------------ *
- * Champs de formulaire
- * ------------------------------------------------------------------ */
-.field { display: block; margin-bottom: 14px; }
-.field span { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+.field { display: block; margin-bottom: 12px; }
+.field span { display: block; font-size: 0.69rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+.field .wrap {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--glass); border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm); padding: 13px 14px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.field .wrap:focus-within { border-color: rgba(79,227,176,0.55); background: var(--glass-2); }
+.field .wrap .unit { color: var(--muted); font-size: 0.95rem; }
 .field input {
-  width: 100%;
-  /* 16px minimum : empêche le zoom automatique iOS au focus */
-  font-size: 16px;
-  font-family: var(--font-body);
-  color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  padding: 13px 14px;
-  transition: border-color var(--dur-fast) ease, box-shadow var(--dur) ease;
+  flex: 1; min-width: 0;
+  font-size: 16px; /* empêche le zoom iOS */
+  font-family: var(--font-title); font-variant-numeric: tabular-nums; font-weight: 600;
+  color: var(--text); background: none; border: none; outline: none;
 }
-.field input:focus {
-  outline: none;
-  border-color: var(--mint);
-  /* Halo de focus discret : repère clair sans être agressif. */
-  box-shadow: 0 0 0 3px rgba(94, 224, 176, 0.16);
-}
-/* Zone de texte (ex. collage d'une sauvegarde à importer). */
-.field textarea {
-  width: 100%;
-  font-size: 16px; /* empêche le zoom auto iOS au focus */
-  font-family: var(--font-body);
-  color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  padding: 13px 14px;
-  line-height: 1.4;
-  resize: vertical;
-  min-height: 120px;
-  transition: border-color var(--dur-fast) ease, box-shadow var(--dur) ease;
-}
-.field textarea:focus {
-  outline: none;
-  border-color: var(--mint);
-  box-shadow: 0 0 0 3px rgba(94, 224, 176, 0.16);
-}
+.field input[type="text"] { font-family: var(--font-body); font-weight: 500; }
+.field.big input { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
 
-/* ------------------------------------------------------------------ *
- * Sélecteur segmenté (ex. choix du thème : Auto / Clair / Sombre)
- * ------------------------------------------------------------------ */
-.segmented {
-  display: flex;
-  gap: 4px;
-  background: var(--surface-2);
-  border-radius: var(--radius-sm);
-  padding: 4px;
-}
-.seg-btn {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--font-body);
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 10px 8px;
-  border-radius: 9px;
-  transition: background var(--dur-fast) ease, color var(--dur-fast) ease,
-              transform var(--dur-fast) var(--ease-spring);
-}
-.seg-btn:active { transform: scale(0.95); }
-.seg-btn.on {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-}
-
-/* ------------------------------------------------------------------ *
- * Zone dangereuse (la seule avec bordure)
- * ------------------------------------------------------------------ */
-.danger-zone {
-  border: 1px solid var(--coral);
-  background: rgba(255, 122, 107, 0.06);
-}
+.danger-zone { border-color: rgba(255, 111, 94, 0.28); background: rgba(255, 111, 94, 0.07); }
 .danger-zone h2 { color: var(--coral); }
 
 /* ------------------------------------------------------------------ *
- * Barre d'onglets
+ * Barre d'onglets flottante
  * ------------------------------------------------------------------ */
 .tabbar {
   position: fixed;
-  left: 0; right: 0; bottom: 0;
-  display: flex;
-  background: rgba(23, 30, 46, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--line);
-  padding-bottom: var(--safe-bottom);
+  left: 16px; right: 16px;
+  bottom: calc(var(--safe-bottom) + 16px);
+  max-width: 528px; margin: 0 auto;
+  display: flex; gap: 2px; padding: 6px;
+  background: rgba(18, 24, 36, 0.82);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   z-index: 50;
 }
 .tab {
-  flex: 1;
-  position: relative;
-  background: none; border: none;
+  flex: 1; background: transparent; border: none;
   color: var(--muted);
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 10px 2px;
-  height: var(--tabbar-h);
-  font-size: 0.7rem;
-  transition: color var(--dur) ease;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 9px 0; border-radius: 16px;
+  font-size: 0.65rem; font-weight: 700;
 }
-/* Indicateur menthe qui glisse en largeur sous l'onglet actif. */
-.tab::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 50%;
-  width: 0; height: 3px;
-  background: var(--mint);
-  border-radius: 0 0 3px 3px;
-  transform: translateX(-50%);
-  transition: width var(--dur) var(--ease-out);
-}
-.tab.active::before { width: 28px; }
-.tab svg { width: 22px; height: 22px; transition: transform var(--dur) var(--ease-spring); }
-.tab:active svg { transform: scale(0.82); }
-.tab.active { color: var(--mint); }
-/* L'icône rebondit à l'activation de l'onglet. */
-.tab.active svg { animation: tabPop var(--dur) var(--ease-spring); }
-@keyframes tabPop {
-  0%   { transform: scale(0.8) translateY(2px); }
-  55%  { transform: scale(1.18) translateY(-2px); }
-  100% { transform: scale(1) translateY(0); }
-}
+.tab svg { width: 19px; height: 19px; }
+.tab.active { color: var(--mint); background: rgba(79, 227, 176, 0.14); }
 
 /* ------------------------------------------------------------------ *
- * Feuille modale (monte du bas)
+ * Feuille modale
  * ------------------------------------------------------------------ */
 .sheet-overlay {
   position: fixed; inset: 0;
-  background: rgba(6, 9, 16, 0);
+  background: rgba(4, 7, 13, 0);
   display: flex; align-items: flex-end;
   z-index: 100;
-  transition: background var(--t-base) ease, backdrop-filter var(--t-base) ease;
-  -webkit-backdrop-filter: blur(0px);
-  backdrop-filter: blur(0px);
+  transition: background 0.24s ease;
 }
-.sheet-overlay.open {
-  background: rgba(6, 9, 16, 0.6);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
-}
+.sheet-overlay.open { background: rgba(4, 7, 13, 0.62); backdrop-filter: blur(2px); }
 
 .sheet {
-  width: 100%;
-  max-width: 560px;
-  margin: 0 auto;
-  background: var(--surface);
-  border-radius: 22px 22px 0 0;
-  padding: 10px 20px calc(24px + var(--safe-bottom));
-  transform: translateY(100%);
-  /* La feuille a un « poids » : ressort à la montée. */
-  transition: transform var(--t-ample) var(--ease-spring);
-  max-height: 88vh; overflow-y: auto;
+  width: 100%; max-width: 560px; margin: 0 auto;
+  background: #131A28;
+  border: 1px solid rgba(255, 255, 255, 0.09); border-bottom: none;
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.5);
+  padding: 12px 20px calc(28px + var(--safe-bottom));
+  transform: translateY(102%);
+  transition: transform 0.34s var(--ease);
+  max-height: 90vh; overflow-y: auto;
 }
 .sheet-overlay.open .sheet { transform: translateY(0); }
+.sheet-body > * { animation: rise 0.36s var(--ease) both; animation-delay: 0.06s; }
 
-/* Le contenu de la feuille se pose en douceur, ligne après ligne. */
-.sheet-overlay.open .sheet-body > * {
-  animation: blockIn var(--dur) var(--ease-out) backwards;
-}
-.sheet-overlay.open .sheet-body > *:nth-child(1) { animation-delay: 0.08s; }
-.sheet-overlay.open .sheet-body > *:nth-child(2) { animation-delay: 0.13s; }
-.sheet-overlay.open .sheet-body > *:nth-child(3) { animation-delay: 0.18s; }
-.sheet-overlay.open .sheet-body > *:nth-child(n+4) { animation-delay: 0.23s; }
-
-.sheet-handle {
-  width: 40px; height: 4px;
-  background: var(--line);
-  border-radius: 999px;
-  margin: 4px auto 14px;
-}
-.sheet-title { margin: 0 0 16px; font-size: 1.2rem; }
+.sheet-handle { width: 42px; height: 4px; background: rgba(255,255,255,0.16); border-radius: 999px; margin: 2px auto 18px; }
+.sheet-title { margin: 0 0 18px; font-size: 1.18rem; }
+.sheet-hint { margin: 12px 0 0; text-align: center; font-size: 0.78rem; color: var(--muted); }
 
 /* ------------------------------------------------------------------ *
  * Toast
  * ------------------------------------------------------------------ */
 .toast {
-  position: fixed;
-  left: 50%;
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 16px);
-  transform: translate(-50%, 20px);
-  background: var(--surface-2);
-  color: var(--text);
-  padding: 12px 18px;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 200;
-  transition: opacity var(--t-base) ease, transform var(--t-base) var(--ease-out);
+  position: fixed; left: 50%;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 26px);
+  transform: translate(-50%, 16px);
+  background: #131A28; color: var(--text);
+  border: 1px solid var(--line);
+  padding: 12px 18px; border-radius: 999px;
+  font-size: 0.86rem; font-weight: 600;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  opacity: 0; pointer-events: none; z-index: 200;
+  transition: opacity 0.2s ease, transform 0.28s var(--ease);
   max-width: 90vw; text-align: center;
   display: inline-flex; align-items: center; gap: 14px;
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-.toast-action {
-  background: none; border: none;
-  color: var(--mint); font-weight: 600; font-size: 0.9rem;
-  padding: 2px 4px; flex: none;
-}
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; animation: toast-in 0.32s var(--ease); }
+.toast-action { background: none; border: none; color: var(--mint); font-weight: 700; font-size: 0.86rem; padding: 2px 4px; flex: none; }
+
+:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; border-radius: 8px; }
 
 /* ------------------------------------------------------------------ *
- * Motion des graphiques SVG
- * ------------------------------------------------------------------ */
-
-/* Ruban du mois : entrée par fondu + léger glissement vertical. On évite tout
-   scaleX sur le <svg> (le repère non-uniforme de preserveAspectRatio="none"
-   fausse la position des segments) : opacité et translation se stabilisent, eux,
-   parfaitement à l'état de repos. */
-.ribbon {
-  animation: ribbonIn var(--dur-slow) var(--ease-out) 0.05s backwards;
-}
-@keyframes ribbonIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: none; }
-}
-
-/* Courbe d'épargne : la ligne se trace, l'aire se remplit, les points éclosent. */
-.savings-chart .area {
-  animation: areaFade var(--dur-slow) ease 0.25s backwards;
-}
-@keyframes areaFade { from { opacity: 0; } to { opacity: 1; } }
-
-.savings-chart .line {
-  stroke-dasharray: 600;
-  stroke-dashoffset: 600;
-  animation: lineDraw 1.1s var(--ease-out) forwards;
-}
-@keyframes lineDraw { to { stroke-dashoffset: 0; } }
-
-.savings-chart .dot-pt {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: dotPop var(--dur) var(--ease-spring) backwards;
-}
-.savings-chart .dot-pt:nth-child(odd)  { animation-delay: 0.7s; }
-.savings-chart .dot-pt:nth-child(even) { animation-delay: 0.85s; }
-@keyframes dotPop { from { transform: scale(0); } to { transform: scale(1); } }
-
-/* Compteur de montants : les chiffres défilent, sans à-coup de largeur
-   (chiffres tabulaires hérités de .figure). */
-.count { display: inline-block; }
-
-/* ------------------------------------------------------------------ *
- * Transitions de vues (View Transitions API)
- * Morph doux entre les écrans. La barre d'onglets porte son propre nom :
- * elle est ainsi isolée du fondu et reste parfaitement fixe pendant le morph.
- * ------------------------------------------------------------------ */
-.tabbar { view-transition-name: tabbar; }
-
-/* Directionnel : les vues glissent dans le sens de la navigation. Le sens est
-   posé sur <html> par le JS (data-nav-dir = "forward" | "back"). Sortie plus
-   vive que l'entrée (règle d'or). */
-::view-transition-old(root) { animation: vtOut var(--t-instant) var(--ease-inout) both; }
-::view-transition-new(root) { animation: vtIn var(--t-base) var(--ease-out) both; }
-
-/* Avant (onglet plus à droite) : l'ancienne sort vers la gauche, la nouvelle entre par la droite. */
-:root[data-nav-dir="forward"]::view-transition-old(root) { animation: slideOutLeft var(--t-instant) var(--ease-inout) both; }
-:root[data-nav-dir="forward"]::view-transition-new(root) { animation: slideInRight var(--t-base) var(--ease-out) both; }
-/* Arrière : sens inverse. */
-:root[data-nav-dir="back"]::view-transition-old(root) { animation: slideOutRight var(--t-instant) var(--ease-inout) both; }
-:root[data-nav-dir="back"]::view-transition-new(root) { animation: slideInLeft var(--t-base) var(--ease-out) both; }
-
-@keyframes vtOut { to   { opacity: 0; transform: translateY(-6px); } }
-@keyframes vtIn  { from { opacity: 0; transform: translateY(10px); } }
-@keyframes slideOutLeft  { to   { opacity: 0; transform: translateX(-18px); } }
-@keyframes slideInRight  { from { opacity: 0; transform: translateX(18px); } }
-@keyframes slideOutRight { to   { opacity: 0; transform: translateX(18px); } }
-@keyframes slideInLeft   { from { opacity: 0; transform: translateX(-18px); } }
-
-/* ------------------------------------------------------------------ *
- * Accessibilité — focus clavier visible
- * ------------------------------------------------------------------ */
-:focus-visible {
-  outline: 2px solid var(--mint);
-  outline-offset: 2px;
-  border-radius: 6px;
-}
-
-/* ------------------------------------------------------------------ *
- * Mode clair — thème choisi dans les réglages (auto / clair / sombre).
- *
- * Le thème sombre est le défaut sur :root. La palette claire s'applique dans
- * deux cas :
- *   1) « clair forcé »  → :root[data-theme="light"]
- *   2) « auto » + système clair → la media query, mais uniquement si aucun
- *      thème n'est forcé (sinon le choix manuel doit gagner).
- * Le « sombre forcé » n'a besoin de rien : c'est déjà le défaut, et la media
- * query ci-dessous ne s'active pas quand data-theme="dark".
- * On ne redéfinit que les couleurs ; tailles et rayons sont inchangés.
- * ------------------------------------------------------------------ */
-
-/* Fragment de palette claire, réutilisé par les deux cas ci-dessus. */
-:root[data-theme="light"] {
-  --bg: #EEF1F7;
-  --surface: #FFFFFF;
-  --surface-2: #EDF1F8;
-  --line: #E0E6F0;
-  --text: #1A2336;
-  --muted: #66728A;
-  --mint: #0B926B;
-  --amber: #A9741A;
-  --amber-dim: #F5E6C7;
-  --coral: #D8442E;
-  --free: #D6DDE9;
-}
-:root[data-theme="light"] .tabbar { background: rgba(255, 255, 255, 0.88); }
-:root[data-theme="light"] .btn { color: #04231A; }
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    --bg: #EEF1F7;
-    --surface: #FFFFFF;
-    --surface-2: #EDF1F8;
-    --line: #E0E6F0;
-    --text: #1A2336;
-    --muted: #66728A;
-    --mint: #0B926B;
-    --amber: #A9741A;
-    --amber-dim: #F5E6C7;
-    --coral: #D8442E;
-    --free: #D6DDE9;
-  }
-  :root:not([data-theme="light"]):not([data-theme="dark"]) .tabbar { background: rgba(255, 255, 255, 0.88); }
-  :root:not([data-theme="light"]):not([data-theme="dark"]) .btn { color: #04231A; }
-}
-
-/* ------------------------------------------------------------------ *
- * Respect de prefers-reduced-motion
+ * Mouvement réduit
  * ------------------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -1004,12 +507,10 @@ p.empty.card { padding: 28px 16px; }
   }
 }
 
-/* ------------------------------------------------------------------ *
- * Très petits écrans (≤ 360px) : on resserre un peu
- * ------------------------------------------------------------------ */
+/* Très petits écrans */
 @media (max-width: 360px) {
-  #app { padding-left: 12px; padding-right: 12px; }
-  .figure { font-size: 2.1rem; }
+  #app { padding-left: 14px; padding-right: 14px; }
+  .dial { width: 200px; height: 200px; }
+  .dial-value { font-size: 2.2rem; }
   .grid-2 { gap: 10px; }
-  .credit-actions .btn.small { flex: 1; }
 }
