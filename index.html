@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover pour gérer les zones sûres iOS (encoches, barre d'accueil) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0F1420">
+  <meta name="description" content="Budgex — ton budget personnel, simple et hors connexion.">
+
+  <!-- Réglages pour l'installation sur iPhone (écran d'accueil plein écran) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Budgex">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+
+  <title>Budgex</title>
+
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Polices Google Fonts. En cas d'absence de réseau, la pile de repli
+       système (définie dans le CSS) prend le relais : l'app reste lisible. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Conteneur principal ; chaque vue est une <section> masquée sauf l'active -->
+  <main id="app">
+    <section id="view-accueil" class="view active"></section>
+    <section id="view-factures" class="view"></section>
+    <section id="view-epargne" class="view"></section>
+    <section id="view-sorties" class="view"></section>
+    <section id="view-credits" class="view"></section>
+    <section id="view-historique" class="view"></section>
+    <section id="view-reglages" class="view"></section>
+  </main>
+
+  <!-- Barre d'onglets fixe en bas : 5 onglets -->
+  <nav class="tabbar" aria-label="Navigation principale">
+    <button class="tab active" data-view="accueil">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+      <span>Accueil</span>
+    </button>
+    <button class="tab" data-view="factures">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2h16v20l-3-2-3 2-2-2-2 2-3-2V2z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+      <span>Factures</span>
+    </button>
+    <button class="tab" data-view="epargne">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v3a2 2 0 0 1-2 2h-1l-1 2h-3l-1-2H9l-1 2H5a2 2 0 0 1-2-2z"/><circle cx="15" cy="11" r="1"/></svg>
+      <span>Épargne</span>
+    </button>
+    <button class="tab" data-view="sorties">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14v6a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5z"/><path d="M19 9h1a2 2 0 0 1 0 4h-1"/><path d="M8 3v2M12 3v2M16 3v2"/></svg>
+      <span>Sorties</span>
+    </button>
+    <button class="tab" data-view="credits">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+      <span>Crédits</span>
+    </button>
+  </nav>
+
+  <!-- Ordre important : le store, puis l'ui, puis l'app qui orchestre -->
+  <script src="js/store.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
