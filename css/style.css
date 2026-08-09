@@ -165,7 +165,9 @@ body.subview #app { padding-bottom: calc(var(--safe-bottom) + 28px); }
 .dial-wrap { position: relative; display: grid; place-items: center; }
 .dial { width: 224px; height: 224px; display: block; transform: rotate(-90deg); }
 .dial circle { transition: stroke-dasharray 0.9s var(--ease); }
-.dial-center { position: absolute; text-align: center; }
+.dial-center { position: absolute; text-align: center; max-width: 150px; }
+.dial-center .subtle { font-size: 0.72rem; line-height: 1.25; margin-top: 4px; }
+.dial-center .eyebrow { font-size: 0.63rem; }
 .dial-value { font-size: 2.6rem; font-weight: 700; letter-spacing: -0.03em; margin: 0; line-height: 1; }
 
 .legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; font-size: 0.78rem; color: var(--text-2); }
@@ -507,10 +509,97 @@ p.empty.card { padding: 30px 18px; }
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * Tablette — deux colonnes de cartes, texte un cran au-dessus
+ * ------------------------------------------------------------------ */
+@media (min-width: 700px) {
+  body { font-size: 17px; }
+  #app { max-width: 720px; }
+
+  .view.active {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 14px;
+    align-items: start;
+  }
+  /* En-têtes, alertes et actions rapides tiennent toute la largeur. */
+  .view.active > .home-header,
+  .view.active > .sub-header,
+  .view.active > .alert,
+  .view.active > .quick { grid-column: 1 / -1; }
+  /* Le conteneur de cascade s'efface pour que ses cartes rejoignent la grille. */
+  .view.active > div.stagger { display: contents; }
+
+  .figure { font-size: 2.6rem; }
+  .dial { width: 250px; height: 250px; }
+  .dial-center { max-width: 168px; }
+  .dial-value { font-size: 2.9rem; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Ordinateur — navigation latérale, trois colonnes, feuille centrée
+ * ------------------------------------------------------------------ */
+@media (min-width: 1000px) {
+  #app {
+    max-width: 1080px;
+    margin: 0 auto 0 max(272px, calc(50% - 400px));
+    padding: 32px 32px 48px;
+  }
+  .view.active { grid-template-columns: repeat(3, 1fr); gap: 0 16px; }
+
+  .home-header, .sub-header { margin-bottom: 22px; }
+  h1 { font-size: 1.7rem; }
+  .home-month { font-size: 1.9rem; }
+  .figure { font-size: 2.9rem; }
+
+  /* Le cadran devient la pièce maîtresse : deux colonnes sur trois. */
+  .dial-card { grid-column: span 2; }
+  .dial { width: 280px; height: 280px; }
+  .dial-center { max-width: 190px; }
+  .dial-value { font-size: 3.2rem; }
+
+  .quick { grid-template-columns: repeat(3, 1fr); }
+  .quick button { flex-direction: row; align-items: center; gap: 10px; padding: 14px 16px; font-size: 0.88rem; }
+
+  /* Barre d'onglets → colonne fixe à gauche. */
+  .tabbar {
+    left: 24px; right: auto; top: 50%; bottom: auto;
+    transform: translateY(-50%);
+    flex-direction: column; gap: 4px;
+    width: 208px; padding: 10px;
+    border-radius: 24px;
+  }
+  .tab {
+    flex-direction: row; justify-content: flex-start; gap: 12px;
+    padding: 12px 14px; font-size: 0.88rem;
+    border-radius: 16px;
+  }
+  .tab svg { width: 20px; height: 20px; }
+  body.subview #app { margin-left: auto; margin-right: auto; }
+
+  /* Feuille modale : boîte centrée plutôt que panneau du bas. */
+  .sheet-overlay { align-items: center; }
+  .sheet {
+    max-width: 460px;
+    border-radius: 26px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    padding: 14px 24px 26px;
+    transform: translateY(24px) scale(0.98);
+    opacity: 0;
+    transition: transform 0.32s var(--ease), opacity 0.24s ease;
+  }
+  .sheet-overlay.open .sheet { transform: none; opacity: 1; }
+  .sheet-handle { display: none; }
+
+  .toast { bottom: 32px; }
+  .update-banner { left: auto; right: 32px; bottom: 32px; max-width: 420px; }
+}
+
 /* Très petits écrans */
 @media (max-width: 360px) {
   #app { padding-left: 14px; padding-right: 14px; }
   .dial { width: 200px; height: 200px; }
+  .dial-center { max-width: 132px; }
   .dial-value { font-size: 2.2rem; }
   .grid-2 { gap: 10px; }
 }
