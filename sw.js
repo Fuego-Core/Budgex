@@ -7,7 +7,7 @@
  * continue de servir l'ancienne version depuis le cache.
  */
 
-const CACHE = 'oboli-v12';
+const CACHE = 'oboli-v13';
 
 // Tous les fichiers nécessaires pour tourner sans réseau.
 // Chemins relatifs pour fonctionner aussi sous un sous-dossier (GitHub Pages).
@@ -43,29 +43,31 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Stratégie « cache d'abord, réseau en secours ».
-// Idéale pour une app 100 % locale : rapide et fonctionnelle hors ligne.
+// Stratégie « réseau d'abord, cache en secours ».
+// On privilégie la dernière version en ligne (fini le blocage sur du cache
+// périmé), tout en restant utilisable hors connexion grâce au cache.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   // On ne gère que les requêtes GET (le reste part directement au réseau).
   if (request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request)
-        .then((response) => {
-          // On met en cache les réponses valides de même origine (nos fichiers).
-          if (response && response.ok && request.url.startsWith(self.location.origin)) {
-            const clone = response.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => {
-          // Hors ligne et non caché : pour une navigation, on renvoie l'accueil.
+    fetch(request)
+      .then((response) => {
+        // Réponse réseau OK : on rafraîchit le cache et on la sert.
+        if (response && response.ok && request.url.startsWith(self.location.origin)) {
+          const clone = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, clone));
+        }
+        return response;
+      })
+      .catch(() =>
+        // Hors ligne (ou échec réseau) : on retombe sur le cache.
+        caches.match(request).then((cached) => {
+          if (cached) return cached;
           if (request.mode === 'navigate') return caches.match('./index.html');
-        });
-    })
+          return undefined;
+        })
+      )
   );
 });

@@ -9,6 +9,10 @@
  */
 
 const App = (() => {
+  // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
+  // tourne bien sur la dernière version, et pas sur un cache périmé).
+  const APP_VERSION = '13';
+
   // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
 
@@ -617,6 +621,8 @@ const App = (() => {
         <p class="subtle">Efface tout et repart d’une app vierge. Sans retour en arrière.</p>
         <button class="btn danger" data-action="reset">Tout effacer</button>
       </section>
+
+      <p class="subtle tiny app-version">Oboli · version ${APP_VERSION}</p>
     `;
   }
 
