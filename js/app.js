@@ -11,7 +11,7 @@
 const App = (() => {
   // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
   // tourne bien sur la dernière version, et pas sur un cache périmé).
-  const APP_VERSION = '18';
+  const APP_VERSION = '19';
 
   // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
@@ -46,7 +46,15 @@ const App = (() => {
     document.body.classList.toggle('subview', view === 'historique' || view === 'reglages');
   }
 
+  // Ordre des vues, pour donner un sens aux transitions (glissement directionnel).
+  const VIEW_ORDER = { accueil: 0, factures: 1, epargne: 2, sorties: 3, credits: 4, historique: 5, reglages: 6 };
+
   function show(view) {
+    // Sens de la navigation : vers une vue « plus loin » = avant, sinon arrière.
+    const from = VIEW_ORDER[currentView] != null ? VIEW_ORDER[currentView] : 0;
+    const to = VIEW_ORDER[view] != null ? VIEW_ORDER[view] : 0;
+    document.documentElement.dataset.navDir = to >= from ? 'forward' : 'back';
+
     const run = () => {
       applyViewClasses(view);
       window.scrollTo(0, 0);
@@ -319,13 +327,13 @@ const App = (() => {
       <div class="grid-2">
         <section class="card">
           <p class="eyebrow">Épargne du mois</p>
-          <p class="figure-sm mint">${UI.countMoney(saved)}</p>
+          <p class="figure-sm mint">${UI.money(saved)}</p>
           <p class="subtle">Objectif ${UI.money(goal)}</p>
           ${UI.bar(goalRatio)}
         </section>
         <section class="card">
           <p class="eyebrow">Sorties</p>
-          <p class="figure-sm ${remaining < 0 ? 'coral' : ''}">${UI.countMoney(remaining)}</p>
+          <p class="figure-sm ${remaining < 0 ? 'coral' : ''}">${UI.money(remaining)}</p>
           <p class="subtle">restant sur ${UI.money(envelope)}</p>
           ${UI.bar(spentRatio, spentRatio > 0.85)}
         </section>

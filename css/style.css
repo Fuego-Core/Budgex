@@ -40,13 +40,22 @@
    * Une seule palette de mouvement pour toute l'app : cohérence garantie.
    * --ease-out  : décélération naturelle (entrées, glissements).
    * --ease-spring : léger rebond (coches, onglets, pastilles).                 */
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);   /* décélération (entrées) */
-  --ease-in: cubic-bezier(0.4, 0, 0.9, 0.5);     /* accélération (sorties) */
-  --ease-emph: cubic-bezier(0.2, 0, 0, 1);       /* « emphasized » : entrées marquées */
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);/* léger rebond (coches, onglets) */
-  --dur-fast: 0.16s;
-  --dur: 0.3s;
-  --dur-slow: 0.5s;
+  /* --- Système de mouvement : 3 durées, point. --- */
+  --t-instant: 120ms;  /* retour au doigt : pression, coche, bascule d'état */
+  --t-base: 220ms;     /* la majorité : fondus, jauges, halos, contrôles */
+  --t-ample: 400ms;    /* changement de contexte : feuille modale */
+
+  /* Easings nommés : sortie (entrées), symétrique (transformations), ressort. */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);    /* ce qui ENTRE : rapide puis décélère */
+  --ease-inout: cubic-bezier(0.4, 0, 0.2, 1);    /* ce qui se TRANSFORME : symétrique */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);/* POIDS : feuille qui monte, relâché */
+
+  /* Alias rétro-compatibles (les anciennes règles pointent dessus). */
+  --dur-fast: var(--t-instant);
+  --dur: var(--t-base);
+  --dur-slow: var(--t-ample);
+  --ease-in: var(--ease-inout);  /* sorties : courbe symétrique, durée plus courte */
+  --ease-emph: var(--ease-out);
 }
 
 /* ------------------------------------------------------------------ *
@@ -226,7 +235,7 @@ button { font-family: inherit; cursor: pointer; }
 
 /* Sortie d'une ligne supprimée : elle se replie proprement avant le rafraîchi. */
 .row.removing {
-  animation: rowOut 0.26s var(--ease-out) forwards;
+  animation: rowOut var(--t-base) var(--ease-inout) forwards;
   overflow: hidden;
 }
 @keyframes rowOut {
@@ -365,7 +374,7 @@ body.subview #app { padding-bottom: calc(var(--safe-bottom) + 24px); }
   display: block; height: 100%;
   background: var(--mint);
   border-radius: 999px;
-  transition: width 0.35s ease;
+  transition: width var(--t-base) var(--ease-out);
   /* Remplissage animé depuis 0 à l'apparition (la largeur cible reste en ligne). */
   animation: barGrow var(--dur-slow) var(--ease-out) backwards;
 }
@@ -512,7 +521,7 @@ body.subview #app { padding-bottom: calc(var(--safe-bottom) + 24px); }
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   z-index: 150;
   transform: translateY(20px); opacity: 0;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity var(--t-base) ease, transform var(--t-base) var(--ease-out);
   font-size: 0.92rem; font-weight: 500;
 }
 .update-banner.show { transform: translateY(0); opacity: 1; }
@@ -614,7 +623,21 @@ p.empty.card { padding: 28px 16px; }
 .link {
   background: none; border: none; color: var(--mint);
   font-size: 0.9rem; font-weight: 500; padding: 4px;
+  transition: opacity var(--t-instant) ease;
 }
+
+/* ------------------------------------------------------------------ *
+ * États de pression universels — tout ce qui est tapable réagit au doigt,
+ * dans les ~120 ms, avant même que le résultat soit calculé.
+ * (transform / opacity uniquement : aucun décalage de mise en page.)
+ * ------------------------------------------------------------------ */
+.row-main.tap { transition: transform var(--t-instant) var(--ease-out), opacity var(--t-instant) ease; }
+.row-main.tap:active { transform: scale(0.985); opacity: 0.7; }
+.link:active { opacity: 0.5; }
+.alert { transition: transform var(--t-instant) var(--ease-out), filter var(--t-instant) ease; }
+.alert.late:active,
+.alert.welcome:active,
+.alert.backup:active { transform: scale(0.99); filter: brightness(0.96); }
 
 /* ------------------------------------------------------------------ *
  * Champs de formulaire
@@ -755,7 +778,7 @@ p.empty.card { padding: 28px 16px; }
   background: rgba(6, 9, 16, 0);
   display: flex; align-items: flex-end;
   z-index: 100;
-  transition: background 0.25s ease, backdrop-filter 0.25s ease;
+  transition: background var(--t-base) ease, backdrop-filter var(--t-base) ease;
   -webkit-backdrop-filter: blur(0px);
   backdrop-filter: blur(0px);
 }
@@ -773,7 +796,8 @@ p.empty.card { padding: 28px 16px; }
   border-radius: 22px 22px 0 0;
   padding: 10px 20px calc(24px + var(--safe-bottom));
   transform: translateY(100%);
-  transition: transform 0.34s var(--ease-out);
+  /* La feuille a un « poids » : ressort à la montée. */
+  transition: transform var(--t-ample) var(--ease-spring);
   max-height: 88vh; overflow-y: auto;
 }
 .sheet-overlay.open .sheet { transform: translateY(0); }
@@ -813,7 +837,7 @@ p.empty.card { padding: 28px 16px; }
   opacity: 0;
   pointer-events: none;
   z-index: 200;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity var(--t-base) ease, transform var(--t-base) var(--ease-out);
   max-width: 90vw; text-align: center;
   display: inline-flex; align-items: center; gap: 14px;
 }
@@ -873,14 +897,25 @@ p.empty.card { padding: 28px 16px; }
  * ------------------------------------------------------------------ */
 .tabbar { view-transition-name: tabbar; }
 
-::view-transition-old(root) {
-  animation: vtOut 0.2s var(--ease-in) both;
-}
-::view-transition-new(root) {
-  animation: vtIn 0.34s var(--ease-emph) both;
-}
+/* Directionnel : les vues glissent dans le sens de la navigation. Le sens est
+   posé sur <html> par le JS (data-nav-dir = "forward" | "back"). Sortie plus
+   vive que l'entrée (règle d'or). */
+::view-transition-old(root) { animation: vtOut var(--t-instant) var(--ease-inout) both; }
+::view-transition-new(root) { animation: vtIn var(--t-base) var(--ease-out) both; }
+
+/* Avant (onglet plus à droite) : l'ancienne sort vers la gauche, la nouvelle entre par la droite. */
+:root[data-nav-dir="forward"]::view-transition-old(root) { animation: slideOutLeft var(--t-instant) var(--ease-inout) both; }
+:root[data-nav-dir="forward"]::view-transition-new(root) { animation: slideInRight var(--t-base) var(--ease-out) both; }
+/* Arrière : sens inverse. */
+:root[data-nav-dir="back"]::view-transition-old(root) { animation: slideOutRight var(--t-instant) var(--ease-inout) both; }
+:root[data-nav-dir="back"]::view-transition-new(root) { animation: slideInLeft var(--t-base) var(--ease-out) both; }
+
 @keyframes vtOut { to   { opacity: 0; transform: translateY(-6px); } }
 @keyframes vtIn  { from { opacity: 0; transform: translateY(10px); } }
+@keyframes slideOutLeft  { to   { opacity: 0; transform: translateX(-18px); } }
+@keyframes slideInRight  { from { opacity: 0; transform: translateX(18px); } }
+@keyframes slideOutRight { to   { opacity: 0; transform: translateX(18px); } }
+@keyframes slideInLeft   { from { opacity: 0; transform: translateX(-18px); } }
 
 /* ------------------------------------------------------------------ *
  * Accessibilité — focus clavier visible
