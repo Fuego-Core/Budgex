@@ -157,8 +157,15 @@ const UI = (() => {
     const total = income > 0 ? income : 1;
 
     // Largeurs proportionnelles au revenu.
-    const wPaid = (paid / total) * W;
-    const wUnpaid = (unpaid / total) * W;
+    let wPaid = (paid / total) * W;
+    let wUnpaid = (unpaid / total) * W;
+    // Garde-fou : si les charges dépassent le revenu, on rééchelonne les deux
+    // segments pour qu'ils ne débordent jamais de la barre.
+    if (wPaid + wUnpaid > W) {
+      const k = W / (wPaid + wUnpaid);
+      wPaid *= k;
+      wUnpaid *= k;
+    }
     const wFree = Math.max(0, W - wPaid - wUnpaid);
 
     const xPaid = 0;

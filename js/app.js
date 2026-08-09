@@ -307,6 +307,11 @@ const App = (() => {
     const remaining = month.envelope - spent;
     const over = remaining < 0;
 
+    // Rythme conseillé : ce qu'il reste réparti sur les jours restants du mois.
+    const now = new Date();
+    const daysLeft = Store.daysInMonth(Store.currentKey()) - now.getDate() + 1;
+    const perDay = !over && daysLeft > 0 ? remaining / daysLeft : null;
+
     const rows = [...month.outings]
       .reverse()
       .map((o) => `
@@ -326,7 +331,10 @@ const App = (() => {
         <p class="figure ${over ? 'coral' : ''}">${UI.money(remaining)}</p>
         ${over
           ? `<p class="subtle warn">Enveloppe dépassée. Ça se rattrape le mois prochain.</p>`
-          : `<p class="subtle">sur ${UI.money(month.envelope)} ce mois-ci</p>`}
+          : `<p class="subtle">sur ${UI.money(month.envelope)} ce mois-ci</p>
+             ${perDay != null
+               ? `<p class="subtle tiny">≈ ${UI.money(perDay)} par jour d’ici la fin du mois (${daysLeft} j)</p>`
+               : ''}`}
       </section>
       <section class="card">
         <h2>Dépenses du mois</h2>
