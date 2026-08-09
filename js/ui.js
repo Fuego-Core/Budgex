@@ -22,6 +22,13 @@ const UI = (() => {
     return euro.format(n || 0);
   }
 
+  // Comme money(), mais enveloppé pour l'animation de défilement des chiffres.
+  // Le texte rendu est déjà la valeur finale : si le JS d'animation ne tourne
+  // pas (ou animations réduites), le montant correct s'affiche quand même.
+  function countMoney(n) {
+    return `<span class="count" data-count-to="${n || 0}">${money(n)}</span>`;
+  }
+
   // Mois abrégés en français, pour les axes du graphique d'épargne.
   const MONTHS_SHORT = [
     'janv', 'févr', 'mars', 'avr', 'mai', 'juin',
@@ -190,10 +197,10 @@ const UI = (() => {
           </pattern>
         </defs>
         <g clip-path="url(#ribbon-clip)">
-          <rect x="${xFree}" y="0" width="${wFree}" height="${H}" fill="var(--free)"/>
-          <rect x="${xUnpaid}" y="0" width="${wUnpaid}" height="${H}" fill="url(#hatch)"/>
-          <rect x="${xPaid}" y="0" width="${wPaid}" height="${H}" fill="var(--mint)"/>
-          <line x1="${cursorX}" y1="-1" x2="${cursorX}" y2="${H + 1}"
+          <rect class="seg seg-free" x="${xFree}" y="0" width="${wFree}" height="${H}" fill="var(--free)"/>
+          <rect class="seg seg-unpaid" x="${xUnpaid}" y="0" width="${wUnpaid}" height="${H}" fill="url(#hatch)"/>
+          <rect class="seg seg-paid" x="${xPaid}" y="0" width="${wPaid}" height="${H}" fill="var(--mint)"/>
+          <line class="cursor" x1="${cursorX}" y1="-1" x2="${cursorX}" y2="${H + 1}"
                 stroke="var(--text)" stroke-width="1.2" opacity="0.9"/>
         </g>
       </svg>
@@ -242,7 +249,7 @@ const UI = (() => {
 
     // Points sur chaque mois.
     const dots = pts
-      .map((p, i) => `<circle cx="${xAt(i)}" cy="${yAt(p.cumulative)}" r="2.6" fill="var(--mint)"/>`)
+      .map((p, i) => `<circle class="dot-pt" cx="${xAt(i)}" cy="${yAt(p.cumulative)}" r="2.6" fill="var(--mint)"/>`)
       .join('');
 
     // Libellés de mois. Les extrémités sont ancrées start/end pour ne pas
@@ -266,8 +273,8 @@ const UI = (() => {
             <stop offset="100%" stop-color="var(--mint)" stop-opacity="0"/>
           </linearGradient>
         </defs>
-        <path d="${areaPath}" fill="url(#area-grad)"/>
-        <path d="${linePath}" fill="none" stroke="var(--mint)" stroke-width="2"
+        <path class="area" d="${areaPath}" fill="url(#area-grad)"/>
+        <path class="line" d="${linePath}" fill="none" stroke="var(--mint)" stroke-width="2"
               stroke-linejoin="round" stroke-linecap="round"/>
         ${dots}
         ${labels}
@@ -295,6 +302,7 @@ const UI = (() => {
 
   return {
     money,
+    countMoney,
     monthLabel,
     shortDate,
     toast,

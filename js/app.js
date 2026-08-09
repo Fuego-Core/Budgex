@@ -36,16 +36,21 @@ const App = (() => {
     const isSub = view === 'historique' || view === 'reglages';
     document.body.classList.toggle('subview', isSub);
 
-    // On remonte en haut et on rend.
+    // On remonte en haut et on rend AVEC la cascade d'entrée (navigation).
     window.scrollTo(0, 0);
-    render();
+    render(true);
   }
 
   /* ------------------------------------------------------------------ *
    * Rendu — aiguille vers la bonne fonction selon la vue courante
    * ------------------------------------------------------------------ */
 
-  function render() {
+  // Minuteur de nettoyage de la classe .enter (cascade d'entrée).
+  let enterTimer = null;
+
+  // render(enter) : `enter` = true seulement à la navigation (cascade + compteurs).
+  // Un simple rafraîchi (après une action) rend sans cascade : instantané.
+  function render(enter = false) {
     switch (currentView) {
       case 'accueil': renderAccueil(); break;
       case 'factures': renderFactures(); break;
@@ -56,6 +61,45 @@ const App = (() => {
       case 'reglages': renderReglages(); break;
     }
     updateBadge();
+
+    const active = document.querySelector('.view.active');
+    if (!active) return;
+    if (enter) {
+      // La classe déclenche les animations CSS ; on la retire une fois finies
+      // pour qu'un rafraîchi ultérieur n'anime pas de nouveau.
+      active.classList.add('enter');
+      countUp(active);
+      clearTimeout(enterTimer);
+      enterTimer = setTimeout(() => active.classList.remove('enter'), 1400);
+    } else {
+      active.classList.remove('enter');
+    }
+  }
+
+  // Fait défiler les montants (.count[data-count-to]) de 0 vers leur valeur.
+  // Respecte « animations réduites » : dans ce cas, on laisse la valeur finale.
+  function countUp(scope) {
+    const reduce = window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    scope.querySelectorAll('.count[data-count-to]').forEach((el) => {
+      const to = parseFloat(el.dataset.countTo) || 0;
+      const finalText = el.textContent;
+      if (reduce || Math.abs(to) < 1) return; // rien à animer : on garde le texte final
+      const DURATION = 700;
+      const t0 = performance.now();
+      el.textContent = UI.money(0);
+      const step = (now) => {
+        const p = Math.min(1, (now - t0) / DURATION);
+        const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+        if (p < 1) {
+          el.textContent = UI.money(to * eased);
+          requestAnimationFrame(step);
+        } else {
+          el.textContent = finalText; // format final exact
+        }
+      };
+      requestAnimationFrame(step);
+    });
   }
 
   // Pastille sur l'icône de l'app (nombre de factures en retard).
@@ -182,7 +226,7 @@ const App = (() => {
       <!-- Grand chiffre : disponible après charges fixes -->
       <section class="card big-figure">
         <p class="eyebrow">Disponible après charges fixes</p>
-        <p class="figure ${Store.disponible() < 0 ? 'neg' : ''}">${UI.money(Store.disponible())}</p>
+        <p class="figure ${Store.disponible() < 0 ? 'neg' : ''}">${UI.countMoney(Store.disponible())}</p>
         <p class="subtle">${UI.money(income)} de revenu − ${UI.money(Store.totalCharges())} de charges</p>
       </section>
 
@@ -190,13 +234,13 @@ const App = (() => {
       <div class="grid-2">
         <section class="card">
           <p class="eyebrow">Épargne du mois</p>
-          <p class="figure-sm mint">${UI.money(saved)}</p>
+          <p class="figure-sm mint">${UI.countMoney(saved)}</p>
           <p class="subtle">Objectif ${UI.money(goal)}</p>
           ${UI.bar(goalRatio)}
         </section>
         <section class="card">
           <p class="eyebrow">Sorties</p>
-          <p class="figure-sm ${remaining < 0 ? 'coral' : ''}">${UI.money(remaining)}</p>
+          <p class="figure-sm ${remaining < 0 ? 'coral' : ''}">${UI.countMoney(remaining)}</p>
           <p class="subtle">restant sur ${UI.money(envelope)}</p>
           ${UI.bar(spentRatio, spentRatio > 0.85)}
         </section>
@@ -266,9 +310,9 @@ const App = (() => {
     $('view-factures').innerHTML = `
       ${subHeader('Factures', `<button class="btn small" data-action="add-charge">+ Ajouter</button>`)}
       <section class="card summary-3">
-        <div><p class="eyebrow">Total</p><p class="figure-xs">${UI.money(total)}</p></div>
-        <div><p class="eyebrow">Payé</p><p class="figure-xs mint">${UI.money(paid)}</p></div>
-        <div><p class="eyebrow">Reste</p><p class="figure-xs ${reste > 0 ? 'amber' : ''}">${UI.money(reste)}</p></div>
+        <div><p class="eyebrow">Total</p><p class="figure-xs">${UI.countMoney(total)}</p></div>
+        <div><p class="eyebrow">Payé</p><p class="figure-xs mint">${UI.countMoney(paid)}</p></div>
+        <div><p class="eyebrow">Reste</p><p class="figure-xs ${reste > 0 ? 'amber' : ''}">${UI.countMoney(reste)}</p></div>
       </section>
       ${charges.length
         ? `<ul class="list">${rows}</ul>`
@@ -301,7 +345,7 @@ const App = (() => {
       ${subHeader('Épargne', `<button class="btn small" data-action="add-saving">+ Ajouter</button>`)}
       <section class="card savings-hero">
         <p class="eyebrow">Total mis de côté</p>
-        <p class="figure">${UI.money(totalAll)}</p>
+        <p class="figure">${UI.countMoney(totalAll)}</p>
       </section>
       <section class="card">
         <h2>Évolution</h2>
@@ -347,7 +391,7 @@ const App = (() => {
       ${subHeader('Sorties', `<button class="btn small" data-action="add-outing">+ Ajouter</button>`)}
       <section class="card outings-hero ${over ? 'over' : ''}">
         <p class="eyebrow">Reste dans l’enveloppe</p>
-        <p class="figure ${over ? 'coral' : ''}">${UI.money(remaining)}</p>
+        <p class="figure ${over ? 'coral' : ''}">${UI.countMoney(remaining)}</p>
         ${over
           ? `<p class="subtle warn">Enveloppe dépassée. Ça se rattrape le mois prochain.</p>`
           : `<p class="subtle">sur ${UI.money(month.envelope)} ce mois-ci</p>
@@ -398,8 +442,8 @@ const App = (() => {
     $('view-credits').innerHTML = `
       ${subHeader('Crédits', `<button class="btn small" data-action="add-credit">+ Ajouter</button>`)}
       <section class="card summary-2">
-        <div><p class="eyebrow">Restant à rembourser</p><p class="figure-xs">${UI.money(totalRemaining)}</p></div>
-        <div><p class="eyebrow">Mensualités</p><p class="figure-xs">${UI.money(totalMonthly)}</p></div>
+        <div><p class="eyebrow">Restant à rembourser</p><p class="figure-xs">${UI.countMoney(totalRemaining)}</p></div>
+        <div><p class="eyebrow">Mensualités</p><p class="figure-xs">${UI.countMoney(totalMonthly)}</p></div>
       </section>
       ${s.credits.length ? cards : `<p class="empty card">Aucun crédit. Profite de cette tranquillité.</p>`}
     `;
@@ -695,6 +739,25 @@ const App = (() => {
   }
 
   /* ------------------------------------------------------------------ *
+   * Sortie animée d'une ligne avant sa suppression
+   * ------------------------------------------------------------------ */
+
+  // Replie la ligne (id) puis exécute `done` (suppression + rafraîchi).
+  // Si l'élément est absent ou les animations sont réduites, on enchaîne direct.
+  function animateRowRemoval(id, done) {
+    const row = document.querySelector(`.view.active .row[data-id="${id}"]`);
+    const reduce = window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!row || reduce) { done(); return; }
+
+    let called = false;
+    const finish = () => { if (called) return; called = true; done(); };
+    row.classList.add('removing');
+    row.addEventListener('animationend', finish, { once: true });
+    setTimeout(finish, 320); // filet de sécurité si animationend ne part pas
+  }
+
+  /* ------------------------------------------------------------------ *
    * Gestion centralisée des clics (délégation d'événements)
    * ------------------------------------------------------------------ */
 
@@ -712,6 +775,8 @@ const App = (() => {
     switch (action) {
       case 'toggle':
         Store.togglePaid(id);
+        // Petite vibration de confirmation (si le téléphone la supporte).
+        if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
         refresh();
         break;
 
@@ -732,11 +797,13 @@ const App = (() => {
         const list = Store.currentMonth().savings;
         const idx = list.findIndex((x) => x.id === id);
         const item = list[idx];
-        Store.removeSaving(id);
-        refresh();
-        UI.toast('Versement supprimé.', {
-          actionLabel: 'Annuler',
-          onAction: () => { Store.restoreSaving(item, idx); refresh(); UI.toast('Versement restauré.'); },
+        animateRowRemoval(id, () => {
+          Store.removeSaving(id);
+          refresh();
+          UI.toast('Versement supprimé.', {
+            actionLabel: 'Annuler',
+            onAction: () => { Store.restoreSaving(item, idx); refresh(); UI.toast('Versement restauré.'); },
+          });
         });
         break;
       }
@@ -746,11 +813,13 @@ const App = (() => {
         const list = Store.currentMonth().outings;
         const idx = list.findIndex((x) => x.id === id);
         const item = list[idx];
-        Store.removeOuting(id);
-        refresh();
-        UI.toast('Sortie supprimée.', {
-          actionLabel: 'Annuler',
-          onAction: () => { Store.restoreOuting(item, idx); refresh(); UI.toast('Sortie restaurée.'); },
+        animateRowRemoval(id, () => {
+          Store.removeOuting(id);
+          refresh();
+          UI.toast('Sortie supprimée.', {
+            actionLabel: 'Annuler',
+            onAction: () => { Store.restoreOuting(item, idx); refresh(); UI.toast('Sortie restaurée.'); },
+          });
         });
         break;
       }
