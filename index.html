@@ -31,6 +31,21 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <!-- Écran d'ouverture : animation de lancement, retirée par le JS après l'intro.
+       Présent dès le HTML pour s'afficher sans clignotement, avant même le JS. -->
+  <div id="splash" aria-hidden="true">
+    <div class="splash-inner">
+      <div class="splash-logo">
+        <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect class="sbar sbar-1" x="9"  y="27" width="8" height="12" rx="2" fill="#06231A"/>
+          <rect class="sbar sbar-2" x="20" y="19" width="8" height="20" rx="2" fill="#06231A"/>
+          <rect class="sbar sbar-3" x="31" y="11" width="8" height="28" rx="2" fill="#06231A"/>
+        </svg>
+      </div>
+      <div class="splash-name">Oboli</div>
+    </div>
+  </div>
+
   <!-- Conteneur principal ; chaque vue est une <section> masquée sauf l'active -->
   <main id="app">
     <section id="view-accueil" class="view active"></section>

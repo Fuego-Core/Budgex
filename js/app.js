@@ -123,6 +123,25 @@ const App = (() => {
   const $ = (id) => document.getElementById(id);
 
   /* ------------------------------------------------------------------ *
+   * Écran d'ouverture (splash)
+   * ------------------------------------------------------------------ */
+
+  // Joue l'animation de lancement puis retire le splash. Respecte
+  // « animations réduites » (dans ce cas on l'enlève tout de suite).
+  function playIntro() {
+    const splash = document.getElementById('splash');
+    if (!splash) return;
+    const reduce = window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { splash.remove(); return; }
+    // On relance la cascade d'accueil juste au moment où le voile se lève :
+    // les cartes montent et les montants défilent pile à la révélation.
+    setTimeout(() => render(true), 950);
+    setTimeout(() => splash.classList.add('gone'), 1000);
+    setTimeout(() => splash.remove(), 1600);
+  }
+
+  /* ------------------------------------------------------------------ *
    * Thème (auto / clair / sombre)
    * ------------------------------------------------------------------ */
 
@@ -567,9 +586,16 @@ const App = (() => {
         <p class="subtle">Tes données ne quittent jamais ce téléphone. Exporte-les de temps en temps pour ne rien perdre.</p>
         <div class="btn-row">
           <button class="btn" data-action="export">Exporter (.json)</button>
-          <button class="btn ghost" data-action="import">Importer un fichier</button>
+          <!-- Import via un <label> qui contient l'input : le sélecteur de fichier
+               s'ouvre nativement au tap (plus fiable que .click() sur PWA iOS). -->
+          <label class="btn ghost">Importer un fichier
+            <input type="file" id="import-file" accept=".json,application/json,text/plain" hidden>
+          </label>
         </div>
-        <input type="file" id="import-file" accept=".json,application/json,text/plain" hidden>
+        <p class="subtle tiny" style="text-align:center;margin-top:10px">
+          L’import ne marche pas ?
+          <button class="link" data-action="import-paste">Colle le contenu à la place</button>
+        </p>
       </section>
 
       <section class="card danger-zone">
@@ -792,6 +818,36 @@ const App = (() => {
     reader.readAsText(file);
   }
 
+  // Repli d'import 100 % fiable : l'utilisateur colle le contenu de sa sauvegarde.
+  // Utile quand le sélecteur de fichier est capricieux (PWA installée sur iOS).
+  function importPasteSheet() {
+    const body = `
+      <p class="subtle">Ouvre ton fichier de sauvegarde (.json) dans une autre app,
+        copie tout son contenu, puis colle-le ici.</p>
+      <label class="field"><span>Contenu de la sauvegarde</span>
+        <textarea id="f-paste" placeholder='{ "version": 1, "settings": { ... }, ... }'></textarea></label>
+      <button class="btn" id="f-import">Importer</button>
+    `;
+    UI.openSheet('Importer depuis un texte', body, (sheet) => {
+      sheet.querySelector('#f-import').addEventListener('click', () => {
+        const txt = sheet.querySelector('#f-paste').value;
+        if (!txt.trim()) { UI.toast('Colle d’abord le contenu de ta sauvegarde.'); return; }
+        try {
+          Store.importJSON(txt);
+          const s = Store.getState();
+          const nc = s.charges.length;
+          const nk = s.credits.length;
+          applyTheme((s.settings && s.settings.theme) || 'auto');
+          UI.closeSheet();
+          show('accueil');
+          UI.toast(`Sauvegarde importée : ${nc} facture${nc > 1 ? 's' : ''}, ${nk} crédit${nk > 1 ? 's' : ''}.`);
+        } catch (e) {
+          UI.toast(e.message || 'Import impossible.');
+        }
+      });
+    });
+  }
+
   /* ------------------------------------------------------------------ *
    * Sortie animée d'une ligne avant sa suppression
    * ------------------------------------------------------------------ */
@@ -912,7 +968,7 @@ const App = (() => {
       }
 
       case 'export': doExport(); break;
-      case 'import': $('import-file').click(); break;
+      case 'import-paste': importPasteSheet(); break;
 
       case 'do-backup': doExport(); refresh(); break;
       case 'snooze-backup':
@@ -1033,6 +1089,7 @@ const App = (() => {
     }
 
     show('accueil');
+    playIntro();
   }
 
   return { init, show, refresh };
