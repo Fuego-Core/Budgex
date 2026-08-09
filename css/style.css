@@ -531,6 +531,16 @@ p.empty.card { padding: 28px 16px; }
 /* Numéro de version en pied des Réglages. */
 .app-version { text-align: center; margin: 18px 0 4px; opacity: 0.7; }
 
+/* Ligne d'état de l'import (visible à chaque étape). */
+.import-status {
+  text-align: center;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.import-status.warn { color: var(--coral); }
+
 /* ------------------------------------------------------------------ *
  * Épargne
  * ------------------------------------------------------------------ */

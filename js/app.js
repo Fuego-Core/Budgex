@@ -11,7 +11,7 @@
 const App = (() => {
   // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
   // tourne bien sur la dernière version, et pas sur un cache périmé).
-  const APP_VERSION = '13';
+  const APP_VERSION = '14';
 
   // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
@@ -614,6 +614,7 @@ const App = (() => {
           L’import ne marche pas ?
           <button class="link" data-action="import-paste">Colle le contenu à la place</button>
         </p>
+        <p id="import-status" class="subtle tiny import-status" style="display:none"></p>
       </section>
 
       <section class="card danger-zone">
@@ -817,17 +818,36 @@ const App = (() => {
     UI.toast('Export téléchargé.');
   }
 
+  // Affiche l'état de l'import dans les Réglages (visible à chaque étape) :
+  // permet de voir exactement où ça bloque quand « rien ne se passe ».
+  function setImportStatus(msg, isError) {
+    const el = $('import-status');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.style.display = msg ? 'block' : 'none';
+    el.classList.toggle('warn', !!isError);
+  }
+
   function doImport(file) {
     const reader = new FileReader();
     reader.onload = () => {
       const text = reader.result;
+      const len = text ? String(text).length : 0;
       if (!text || !String(text).trim()) {
-        UI.toast('Le fichier semble vide. Réessaie ou colle le contenu.');
+        setImportStatus('Le fichier lu est vide (0 caractère). Essaie « Colle le contenu ».', true);
+        UI.toast('Le fichier semble vide.');
         return;
       }
-      applyImport(text);
+      setImportStatus('Fichier lu (' + len + ' caractères), import en cours…');
+      const ok = applyImport(text);
+      if (!ok) {
+        setImportStatus('Import refusé : le contenu n’est pas une sauvegarde valide (peut-être tronqué). Essaie « Colle le contenu ».', true);
+      }
     };
-    reader.onerror = () => UI.toast('Lecture du fichier impossible. Essaie « Colle le contenu ».');
+    reader.onerror = () => {
+      setImportStatus('Lecture du fichier impossible sur cet appareil. Essaie « Colle le contenu ».', true);
+      UI.toast('Lecture du fichier impossible.');
+    };
     reader.readAsText(file);
   }
 
@@ -1086,9 +1106,19 @@ const App = (() => {
 
     // Import de fichier (l'input est recréé à chaque rendu des réglages).
     document.body.addEventListener('change', (e) => {
-      if (e.target && e.target.id === 'import-file' && e.target.files[0]) {
-        doImport(e.target.files[0]);
-        e.target.value = '';
+      if (e.target && e.target.id === 'import-file') {
+        const f = e.target.files && e.target.files[0];
+        if (f) {
+          // Retour immédiat visible : si tu vois ce message, la sélection a bien
+          // été reçue. Si tu ne vois RIEN après avoir choisi le fichier, c'est
+          // qu'Android a rechargé la page pendant le sélecteur → passe par
+          // « Colle le contenu ».
+          setImportStatus('Fichier « ' + f.name + ' » reçu (' + f.size + ' o), lecture…');
+          doImport(f);
+          e.target.value = '';
+        } else {
+          setImportStatus('Aucun fichier reçu. Réessaie ou colle le contenu.', true);
+        }
       }
     });
 
