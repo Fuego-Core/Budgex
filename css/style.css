@@ -260,6 +260,30 @@ body.subview #app { padding-bottom: calc(var(--safe-bottom) + 24px); }
 .home-month { font-size: 1.5rem; }
 .home-actions { display: flex; gap: 8px; }
 
+/* Ligne de marque en tête de l'accueil : petit logo + « Oboli ». */
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 2px 0 12px;
+}
+.brand-logo {
+  width: 28px; height: 28px;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #6ff0c2, #38c99a);
+  display: grid; place-items: center;
+  box-shadow: 0 3px 10px rgba(56, 201, 154, 0.30);
+  flex: none;
+}
+.brand-logo svg { width: 16px; height: 16px; display: block; }
+.brand-name {
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
 .icon-btn {
   width: 40px; height: 40px;
   display: grid; place-items: center;

@@ -225,6 +225,8 @@ const App = (() => {
       .join('');
 
     $('view-accueil').innerHTML = `
+      <div class="brand-row">${brandLogo()}<span class="brand-name">Oboli</span></div>
+
       <header class="home-header">
         <div>
           <p class="eyebrow">Ce mois-ci</p>
@@ -323,6 +325,15 @@ const App = (() => {
           : `<p class="empty">Aucun crédit en cours. Rien à rembourser, c’est déjà ça.</p>`}
       </section>
     `;
+  }
+
+  // Petit logo de marque (les barres ascendantes sur la tuile menthe, via CSS).
+  function brandLogo() {
+    return `<span class="brand-logo" aria-hidden="true"><svg viewBox="0 0 48 48" fill="#06231A">
+      <rect x="9" y="27" width="8" height="12" rx="2"/>
+      <rect x="20" y="19" width="8" height="20" rx="2"/>
+      <rect x="31" y="11" width="8" height="28" rx="2"/>
+    </svg></span>`;
   }
 
   function homeChargeRow(c) {
