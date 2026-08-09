@@ -11,7 +11,7 @@
 const App = (() => {
   // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
   // tourne bien sur la dernière version, et pas sur un cache périmé).
-  const APP_VERSION = '14';
+  const APP_VERSION = '15';
 
   // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
@@ -876,11 +876,28 @@ const App = (() => {
         copie tout son contenu, puis colle-le ici.</p>
       <label class="field"><span>Contenu de la sauvegarde</span>
         <textarea id="f-paste" placeholder='{ "version": 1, "settings": { ... }, ... }'></textarea></label>
+      <p id="f-paste-count" class="subtle tiny" style="margin:-6px 0 8px">0 caractère collé</p>
       <p id="f-paste-err" class="subtle warn" style="display:none"></p>
       <button class="btn" id="f-import">Importer</button>
     `;
     UI.openSheet('Importer depuis un texte', body, (sheet) => {
       const err = sheet.querySelector('#f-paste-err');
+      const ta = sheet.querySelector('#f-paste');
+      const count = sheet.querySelector('#f-paste-count');
+      // Compteur en direct : permet de voir si le collage est complet ou tronqué.
+      const updateCount = () => {
+        const n = ta.value.length;
+        count.textContent = n + ' caractère' + (n > 1 ? 's' : '') + ' collé' + (n > 1 ? 's' : '');
+        // Une sauvegarde complète fait au moins quelques centaines de caractères.
+        const looksClosed = /}\s*$/.test(ta.value.trim());
+        if (n > 0 && !looksClosed) {
+          count.textContent += ' — ⚠️ le texte ne se termine pas par « } », il est peut-être tronqué';
+          count.classList.add('warn');
+        } else {
+          count.classList.remove('warn');
+        }
+      };
+      ta.addEventListener('input', updateCount);
       sheet.querySelector('#f-import').addEventListener('click', () => {
         err.style.display = 'none';
         const txt = sheet.querySelector('#f-paste').value;
