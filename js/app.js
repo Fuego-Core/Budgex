@@ -11,7 +11,7 @@
 const App = (() => {
   // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
   // tourne bien sur la dernière version, et pas sur un cache périmé).
-  const APP_VERSION = '15';
+  const APP_VERSION = '16';
 
   // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
@@ -828,6 +828,21 @@ const App = (() => {
     el.classList.toggle('warn', !!isError);
   }
 
+  // Récupère un fichier éventuellement en attente dans l'input et le traite.
+  // Indispensable sur Android : au retour du sélecteur, l'événement 'change'
+  // n'est pas toujours émis, et un re-rendu recréerait l'input (fichier perdu).
+  // On lit donc le fichier ici, avant tout ré-affichage. Retourne true si un
+  // fichier a été pris en charge.
+  function checkPendingImportFile() {
+    const input = $('import-file');
+    if (!input || !input.files || !input.files[0]) return false;
+    const f = input.files[0];
+    input.value = ''; // vide l'input tout de suite : évite un double traitement
+    setImportStatus('Fichier « ' + f.name + ' » reçu (' + f.size + ' o), lecture…');
+    doImport(f);
+    return true;
+  }
+
   function doImport(file) {
     const reader = new FileReader();
     reader.onload = () => {
@@ -1121,30 +1136,25 @@ const App = (() => {
     // Un seul écouteur de clic pour toute l'app (délégation).
     document.body.addEventListener('click', onClick);
 
-    // Import de fichier (l'input est recréé à chaque rendu des réglages).
+    // Import de fichier — cas normal : l'événement 'change' se déclenche.
     document.body.addEventListener('change', (e) => {
-      if (e.target && e.target.id === 'import-file') {
-        const f = e.target.files && e.target.files[0];
-        if (f) {
-          // Retour immédiat visible : si tu vois ce message, la sélection a bien
-          // été reçue. Si tu ne vois RIEN après avoir choisi le fichier, c'est
-          // qu'Android a rechargé la page pendant le sélecteur → passe par
-          // « Colle le contenu ».
-          setImportStatus('Fichier « ' + f.name + ' » reçu (' + f.size + ' o), lecture…');
-          doImport(f);
-          e.target.value = '';
-        } else {
-          setImportStatus('Aucun fichier reçu. Réessaie ou colle le contenu.', true);
-        }
-      }
+      if (e.target && e.target.id === 'import-file') checkPendingImportFile();
     });
 
-    // Retour au premier plan : on rebascule le mois si besoin, puis on rerend.
+    // Filets de secours pour Android : au retour du sélecteur de fichier,
+    // 'change' n'est pas toujours émis. On revérifie donc l'input dès que la
+    // fenêtre reprend le focus / redevient visible — AVANT tout re-rendu qui
+    // recréerait l'input et perdrait le fichier choisi.
+    window.addEventListener('focus', () => { checkPendingImportFile(); });
+
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        Store.rollover();
-        render();
-      }
+      if (document.visibilityState !== 'visible') return;
+      // 1) Un fichier choisi vient-il d'arriver ? On le traite en priorité
+      //    (sinon le render() ci-dessous recréerait l'input et le perdrait).
+      if (checkPendingImportFile()) return;
+      // 2) Sinon, retour au premier plan classique : bascule de mois + rendu.
+      Store.rollover();
+      render();
     });
 
     // On demande un stockage « persistant » : le navigateur évite alors
