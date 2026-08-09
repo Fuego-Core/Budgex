@@ -495,7 +495,12 @@ const Store = (() => {
     // On retire un éventuel BOM UTF-8 en tête (fréquent quand un fichier est
     // réécrit par iOS/Fichiers ou un éditeur) et les espaces autour : sans ça,
     // JSON.parse échoue et la sauvegarde semble « ne pas revenir ».
-    const clean = String(text).replace(/^\uFEFF/, '').trim();
+    let clean = String(text).replace(/^\uFEFF/, '').trim();
+    // Normalise les guillemets typographiques : le copier-coller mobile remplace
+    // parfois " par \u201C \u201D et ' par \u2018 \u2019, ce qui fait \u00E9chouer JSON.parse \u00E0 tort.
+    clean = clean
+      .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')
+      .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'");
     try {
       data = JSON.parse(clean);
     } catch (e) {

@@ -584,6 +584,18 @@ p.empty.card { padding: 28px 16px; }
 .btn-row { display: flex; gap: 10px; margin-top: 12px; }
 .btn-row .btn { width: 100%; }
 
+/* Bouton d'import fichier : l'input transparent couvre tout le bouton, pour
+   ouvrir le sélecteur de façon fiable au tap (Android/iOS). */
+.file-btn { position: relative; overflow: hidden; }
+.file-input {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0; /* évite tout débordement du widget natif */
+}
+
 .link {
   background: none; border: none; color: var(--mint);
   font-size: 0.9rem; font-weight: 500; padding: 4px;

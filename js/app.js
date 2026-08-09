@@ -599,10 +599,11 @@ const App = (() => {
           <button class="btn" data-action="export">Exporter (.json)</button>
           <!-- Import via un <label> qui contient l'input : le sélecteur de fichier
                s'ouvre nativement au tap (plus fiable que .click() sur PWA iOS). -->
-          <label class="btn ghost">Importer un fichier
-            <!-- Pas de filtre accept : certains gestionnaires Android masquent
-                 les .json quand un filtre est présent. -->
-            <input type="file" id="import-file" hidden>
+          <!-- L'input transparent recouvre tout le bouton : le picker s'ouvre au
+               tap de façon fiable (un input en display:none ne s'ouvre pas
+               toujours sur Chrome Android). Pas de filtre accept non plus. -->
+          <label class="btn ghost file-btn">Importer un fichier
+            <input type="file" id="import-file" class="file-input">
           </label>
         </div>
         <p class="subtle tiny" style="text-align:center;margin-top:10px">
