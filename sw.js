@@ -3,11 +3,11 @@
  * Met en cache tous les fichiers de l'app pour un fonctionnement hors connexion.
  *
  * IMPORTANT : à chaque mise à jour de l'app, incrémente le numéro de version
- * ci-dessous (CACHE → 'oboli-v5', 'oboli-v6'…). Sans ça, le téléphone
+ * ci-dessous (CACHE → 'oboli-v6', 'oboli-v7'…). Sans ça, le téléphone
  * continue de servir l'ancienne version depuis le cache.
  */
 
-const CACHE = 'oboli-v4';
+const CACHE = 'oboli-v5';
 
 // Tous les fichiers nécessaires pour tourner sans réseau.
 // Chemins relatifs pour fonctionner aussi sous un sous-dossier (GitHub Pages).

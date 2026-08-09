@@ -787,8 +787,8 @@ const App = (() => {
         confirmSheet(
           'Repartir de zéro',
           'Tout sera effacé et l’app repartira vierge. Cette action est définitive.',
-          'Tout effacer',
-          () => { Store.resetAll(); UI.toast('Données réinitialisées.'); show('accueil'); }
+          'Oui, tout effacer',
+          () => { Store.resetAll(); show('accueil'); UI.toast('Tout est effacé. On repart à neuf.'); }
         );
         break;
     }
