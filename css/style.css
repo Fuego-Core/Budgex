@@ -515,6 +515,36 @@ p.empty.card { padding: 28px 16px; }
 }
 
 /* ------------------------------------------------------------------ *
+ * Sélecteur segmenté (ex. choix du thème : Auto / Clair / Sombre)
+ * ------------------------------------------------------------------ */
+.segmented {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+}
+.seg-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 8px;
+  border-radius: 9px;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease,
+              transform var(--dur-fast) var(--ease-spring);
+}
+.seg-btn:active { transform: scale(0.95); }
+.seg-btn.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+/* ------------------------------------------------------------------ *
  * Zone dangereuse (la seule avec bordure)
  * ------------------------------------------------------------------ */
 .danger-zone {
@@ -700,30 +730,51 @@ p.empty.card { padding: 28px 16px; }
 }
 
 /* ------------------------------------------------------------------ *
- * Mode clair — suit le réglage du téléphone.
+ * Mode clair — thème choisi dans les réglages (auto / clair / sombre).
+ *
+ * Le thème sombre est le défaut sur :root. La palette claire s'applique dans
+ * deux cas :
+ *   1) « clair forcé »  → :root[data-theme="light"]
+ *   2) « auto » + système clair → la media query, mais uniquement si aucun
+ *      thème n'est forcé (sinon le choix manuel doit gagner).
+ * Le « sombre forcé » n'a besoin de rien : c'est déjà le défaut, et la media
+ * query ci-dessous ne s'active pas quand data-theme="dark".
  * On ne redéfinit que les couleurs ; tailles et rayons sont inchangés.
- * Les accents sont choisis pour rester lisibles sur fond clair.
  * ------------------------------------------------------------------ */
+
+/* Fragment de palette claire, réutilisé par les deux cas ci-dessus. */
+:root[data-theme="light"] {
+  --bg: #EEF1F7;
+  --surface: #FFFFFF;
+  --surface-2: #EDF1F8;
+  --line: #E0E6F0;
+  --text: #1A2336;
+  --muted: #66728A;
+  --mint: #0B926B;
+  --amber: #A9741A;
+  --amber-dim: #F5E6C7;
+  --coral: #D8442E;
+  --free: #D6DDE9;
+}
+:root[data-theme="light"] .tabbar { background: rgba(255, 255, 255, 0.88); }
+:root[data-theme="light"] .btn { color: #04231A; }
+
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
     --bg: #EEF1F7;
     --surface: #FFFFFF;
     --surface-2: #EDF1F8;
     --line: #E0E6F0;
-
     --text: #1A2336;
     --muted: #66728A;
-
-    --mint: #0B926B;         /* argent gardé, actions positives */
-    --amber: #A9741A;        /* attention, à payer */
-    --amber-dim: #F5E6C7;    /* fond du motif hachuré */
-    --coral: #D8442E;        /* dépassement, suppression */
-    --free: #D6DDE9;         /* segment « libre » du ruban */
+    --mint: #0B926B;
+    --amber: #A9741A;
+    --amber-dim: #F5E6C7;
+    --coral: #D8442E;
+    --free: #D6DDE9;
   }
-  /* Barre d'onglets translucide claire */
-  .tabbar { background: rgba(255, 255, 255, 0.88); }
-  /* Le vert vif du bouton primaire garde un texte foncé lisible */
-  .btn { color: #04231A; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .tabbar { background: rgba(255, 255, 255, 0.88); }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .btn { color: #04231A; }
 }
 
 /* ------------------------------------------------------------------ *

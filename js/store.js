@@ -53,7 +53,7 @@ const Store = (() => {
     const now = monthKey();
     return {
       version: 1,
-      settings: { income: 0, savingsGoal: 0, outingBudget: 0 },
+      settings: { income: 0, savingsGoal: 0, outingBudget: 0, theme: 'auto' },
       charges: [],
       credits: [],
       months: {
@@ -68,6 +68,12 @@ const Store = (() => {
   // Garantit la présence du bloc `meta` (pour les anciens états importés).
   function ensureMeta() {
     if (!state.meta) state.meta = { lastExport: null, backupSnooze: null };
+  }
+
+  // Garantit des réglages complets (pour les anciennes sauvegardes sans thème).
+  function ensureSettings() {
+    if (!state.settings) state.settings = { income: 0, savingsGoal: 0, outingBudget: 0 };
+    if (!state.settings.theme) state.settings.theme = 'auto';
   }
 
   /* ------------------------------------------------------------------ *
@@ -106,6 +112,7 @@ const Store = (() => {
     }
 
     ensureMeta();
+    ensureSettings();
     rollover(); // met l'état à jour selon le mois courant
     return state;
   }
@@ -426,6 +433,13 @@ const Store = (() => {
     save();
   }
 
+  // Mémorise le thème choisi : 'auto' | 'light' | 'dark'.
+  function setTheme(theme) {
+    ensureSettings();
+    state.settings.theme = theme;
+    save();
+  }
+
   // Exporte l'état complet en chaîne JSON lisible.
   function exportJSON() {
     return JSON.stringify(state, null, 2);
@@ -478,8 +492,12 @@ const Store = (() => {
   // Importe un JSON (chaîne). Valide la structure ; lève une erreur claire sinon.
   function importJSON(text) {
     let data;
+    // On retire un éventuel BOM UTF-8 en tête (fréquent quand un fichier est
+    // réécrit par iOS/Fichiers ou un éditeur) et les espaces autour : sans ça,
+    // JSON.parse échoue et la sauvegarde semble « ne pas revenir ».
+    const clean = String(text).replace(/^\uFEFF/, '').trim();
     try {
-      data = JSON.parse(text);
+      data = JSON.parse(clean);
     } catch (e) {
       throw new Error('Fichier illisible : ce n’est pas du JSON valide.');
     }
@@ -552,6 +570,7 @@ const Store = (() => {
     removeCredit,
     // réglages / données
     updateSettings,
+    setTheme,
     exportJSON,
     importJSON,
     markExported,

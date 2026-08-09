@@ -123,6 +123,40 @@ const App = (() => {
   const $ = (id) => document.getElementById(id);
 
   /* ------------------------------------------------------------------ *
+   * Thème (auto / clair / sombre)
+   * ------------------------------------------------------------------ */
+
+  // Applique le thème choisi : pose data-theme sur <html> (le CSS fait le reste)
+  // et met la couleur de la barre système en accord.
+  function applyTheme(theme) {
+    const root = document.documentElement;
+    if (theme === 'light' || theme === 'dark') {
+      root.setAttribute('data-theme', theme);
+    } else {
+      root.removeAttribute('data-theme'); // 'auto' : on laisse le système décider
+    }
+
+    const DARK = '#0F1420';
+    const LIGHT = '#EEF1F7';
+    const metas = document.querySelectorAll('meta[name="theme-color"]');
+    if (theme === 'light' || theme === 'dark') {
+      // Forcé : même couleur partout, quel que soit le média du <meta>.
+      const c = theme === 'dark' ? DARK : LIGHT;
+      metas.forEach((m) => m.setAttribute('content', c));
+    } else {
+      // Auto : on rétablit les valeurs pilotées par le média.
+      const systemDark = window.matchMedia
+        && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      metas.forEach((m) => {
+        const media = m.getAttribute('media') || '';
+        if (media.includes('dark')) m.setAttribute('content', DARK);
+        else if (media.includes('light')) m.setAttribute('content', LIGHT);
+        else m.setAttribute('content', systemDark ? DARK : LIGHT);
+      });
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
    * Vue Accueil
    * ------------------------------------------------------------------ */
 
@@ -495,6 +529,7 @@ const App = (() => {
 
   function renderReglages() {
     const s = Store.getState();
+    const theme = (s.settings && s.settings.theme) || 'auto';
     $('view-reglages').innerHTML = `
       ${backHeader('Réglages')}
       <section class="card">
@@ -515,13 +550,26 @@ const App = (() => {
       </section>
 
       <section class="card">
+        <h2>Apparence</h2>
+        <p class="subtle">Choisis le thème, ou laisse-le suivre ton téléphone.</p>
+        <div class="segmented" role="group" aria-label="Thème">
+          <button class="seg-btn ${theme === 'auto' ? 'on' : ''}" data-action="set-theme" data-theme="auto"
+            ${theme === 'auto' ? 'aria-pressed="true"' : ''}>Auto</button>
+          <button class="seg-btn ${theme === 'light' ? 'on' : ''}" data-action="set-theme" data-theme="light"
+            ${theme === 'light' ? 'aria-pressed="true"' : ''}>Clair</button>
+          <button class="seg-btn ${theme === 'dark' ? 'on' : ''}" data-action="set-theme" data-theme="dark"
+            ${theme === 'dark' ? 'aria-pressed="true"' : ''}>Sombre</button>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>Sauvegarde</h2>
         <p class="subtle">Tes données ne quittent jamais ce téléphone. Exporte-les de temps en temps pour ne rien perdre.</p>
         <div class="btn-row">
           <button class="btn" data-action="export">Exporter (.json)</button>
           <button class="btn ghost" data-action="import">Importer un fichier</button>
         </div>
-        <input type="file" id="import-file" accept="application/json,.json" hidden>
+        <input type="file" id="import-file" accept=".json,application/json,text/plain" hidden>
       </section>
 
       <section class="card danger-zone">
@@ -728,8 +776,14 @@ const App = (() => {
     reader.onload = () => {
       try {
         Store.importJSON(reader.result);
-        UI.toast('Données importées.');
-        refresh();
+        const s = Store.getState();
+        const nc = s.charges.length;
+        const nk = s.credits.length;
+        // Le thème éventuellement présent dans la sauvegarde s'applique aussi.
+        applyTheme((s.settings && s.settings.theme) || 'auto');
+        // On bascule sur l'accueil pour que le résultat soit visible tout de suite.
+        show('accueil');
+        UI.toast(`Sauvegarde importée : ${nc} facture${nc > 1 ? 's' : ''}, ${nk} crédit${nk > 1 ? 's' : ''}.`);
       } catch (e) {
         UI.toast(e.message || 'Import impossible.');
       }
@@ -844,6 +898,19 @@ const App = (() => {
         break;
       }
 
+      case 'set-theme': {
+        const theme = el.dataset.theme;
+        Store.setTheme(theme);
+        applyTheme(theme);
+        render(); // met à jour l'état actif des boutons du sélecteur
+        UI.toast(
+          theme === 'auto' ? 'Thème : automatique.'
+            : theme === 'light' ? 'Thème clair.'
+              : 'Thème sombre.'
+        );
+        break;
+      }
+
       case 'export': doExport(); break;
       case 'import': $('import-file').click(); break;
 
@@ -910,6 +977,9 @@ const App = (() => {
 
   function init() {
     Store.load();
+
+    // Thème choisi (auto / clair / sombre) appliqué avant le premier rendu.
+    applyTheme((Store.getState().settings && Store.getState().settings.theme) || 'auto');
 
     // Onglets du bas.
     document.querySelectorAll('.tab').forEach((tab) => {
