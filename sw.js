@@ -7,7 +7,7 @@
  * continue de servir l'ancienne version depuis le cache.
  */
 
-const CACHE = 'oboli-v10';
+const CACHE = 'oboli-v11';
 
 // Tous les fichiers nécessaires pour tourner sans réseau.
 // Chemins relatifs pour fonctionner aussi sous un sous-dossier (GitHub Pages).
@@ -19,9 +19,9 @@ const ASSETS = [
   './js/ui.js',
   './js/app.js',
   './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-512.png',
+  './icons/icon-192-v2.png',
+  './icons/icon-512-v2.png',
+  './icons/icon-maskable-512-v2.png',
 ];
 
 // Installation : on pré-remplit le cache et on active la nouvelle version

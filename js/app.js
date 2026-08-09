@@ -600,7 +600,9 @@ const App = (() => {
           <!-- Import via un <label> qui contient l'input : le sélecteur de fichier
                s'ouvre nativement au tap (plus fiable que .click() sur PWA iOS). -->
           <label class="btn ghost">Importer un fichier
-            <input type="file" id="import-file" accept=".json,application/json,text/plain" hidden>
+            <!-- Pas de filtre accept : certains gestionnaires Android masquent
+                 les .json quand un filtre est présent. -->
+            <input type="file" id="import-file" hidden>
           </label>
         </div>
         <p class="subtle tiny" style="text-align:center;margin-top:10px">
@@ -811,22 +813,32 @@ const App = (() => {
   function doImport(file) {
     const reader = new FileReader();
     reader.onload = () => {
-      try {
-        Store.importJSON(reader.result);
-        const s = Store.getState();
-        const nc = s.charges.length;
-        const nk = s.credits.length;
-        // Le thème éventuellement présent dans la sauvegarde s'applique aussi.
-        applyTheme((s.settings && s.settings.theme) || 'auto');
-        // On bascule sur l'accueil pour que le résultat soit visible tout de suite.
-        show('accueil');
-        UI.toast(`Sauvegarde importée : ${nc} facture${nc > 1 ? 's' : ''}, ${nk} crédit${nk > 1 ? 's' : ''}.`);
-      } catch (e) {
-        UI.toast(e.message || 'Import impossible.');
+      const text = reader.result;
+      if (!text || !String(text).trim()) {
+        UI.toast('Le fichier semble vide. Réessaie ou colle le contenu.');
+        return;
       }
+      applyImport(text);
     };
-    reader.onerror = () => UI.toast('Lecture du fichier impossible.');
+    reader.onerror = () => UI.toast('Lecture du fichier impossible. Essaie « Colle le contenu ».');
     reader.readAsText(file);
+  }
+
+  // Applique un texte de sauvegarde. Retourne true si l'import a réussi.
+  function applyImport(text) {
+    try {
+      Store.importJSON(text);
+      const s = Store.getState();
+      const nc = s.charges.length;
+      const nk = s.credits.length;
+      applyTheme((s.settings && s.settings.theme) || 'auto');
+      show('accueil'); // on montre le résultat tout de suite
+      UI.toast(`Sauvegarde importée : ${nc} facture${nc > 1 ? 's' : ''}, ${nk} crédit${nk > 1 ? 's' : ''}.`);
+      return true;
+    } catch (e) {
+      UI.toast(e.message || 'Import impossible.');
+      return false;
+    }
   }
 
   // Repli d'import 100 % fiable : l'utilisateur colle le contenu de sa sauvegarde.
@@ -837,12 +849,19 @@ const App = (() => {
         copie tout son contenu, puis colle-le ici.</p>
       <label class="field"><span>Contenu de la sauvegarde</span>
         <textarea id="f-paste" placeholder='{ "version": 1, "settings": { ... }, ... }'></textarea></label>
+      <p id="f-paste-err" class="subtle warn" style="display:none"></p>
       <button class="btn" id="f-import">Importer</button>
     `;
     UI.openSheet('Importer depuis un texte', body, (sheet) => {
+      const err = sheet.querySelector('#f-paste-err');
       sheet.querySelector('#f-import').addEventListener('click', () => {
+        err.style.display = 'none';
         const txt = sheet.querySelector('#f-paste').value;
-        if (!txt.trim()) { UI.toast('Colle d’abord le contenu de ta sauvegarde.'); return; }
+        if (!txt.trim()) {
+          err.textContent = 'Colle d’abord le contenu de ta sauvegarde.';
+          err.style.display = 'block';
+          return;
+        }
         try {
           Store.importJSON(txt);
           const s = Store.getState();
@@ -853,7 +872,9 @@ const App = (() => {
           show('accueil');
           UI.toast(`Sauvegarde importée : ${nc} facture${nc > 1 ? 's' : ''}, ${nk} crédit${nk > 1 ? 's' : ''}.`);
         } catch (e) {
-          UI.toast(e.message || 'Import impossible.');
+          // Erreur affichée dans la feuille (persistante), pas en toast fugace.
+          err.textContent = (e.message || 'Import impossible.') + ' Vérifie que tu as bien collé TOUT le contenu du fichier.';
+          err.style.display = 'block';
         }
       });
     });
