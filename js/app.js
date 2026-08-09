@@ -11,7 +11,7 @@
 const App = (() => {
   // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
   // tourne bien sur la dernière version, et pas sur un cache périmé).
-  const APP_VERSION = '16';
+  const APP_VERSION = '17';
 
   // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
@@ -1142,19 +1142,23 @@ const App = (() => {
     });
 
     // Filets de secours pour Android : au retour du sélecteur de fichier,
-    // 'change' n'est pas toujours émis. On revérifie donc l'input dès que la
-    // fenêtre reprend le focus / redevient visible — AVANT tout re-rendu qui
-    // recréerait l'input et perdrait le fichier choisi.
-    window.addEventListener('focus', () => { checkPendingImportFile(); });
+    // 'change' n'est pas toujours émis, ET le fichier peut n'être attaché à
+    // l'input qu'avec un léger délai. On revérifie donc plusieurs fois.
+    // IMPORTANT : on ne ré-affiche PAS la page au retour (sauf bascule de mois),
+    // car un render() recréerait l'input et perdrait le fichier en cours.
+    const recheckImport = () => {
+      checkPendingImportFile();
+      setTimeout(checkPendingImportFile, 300);
+      setTimeout(checkPendingImportFile, 900);
+    };
+    window.addEventListener('focus', recheckImport);
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
-      // 1) Un fichier choisi vient-il d'arriver ? On le traite en priorité
-      //    (sinon le render() ci-dessous recréerait l'input et le perdrait).
-      if (checkPendingImportFile()) return;
-      // 2) Sinon, retour au premier plan classique : bascule de mois + rendu.
-      Store.rollover();
-      render();
+      recheckImport();
+      // On ne re-rend QUE si le mois a réellement basculé (rollover() renvoie
+      // true) : sinon on préserve la page (et le champ fichier) intacte.
+      if (Store.rollover()) render();
     });
 
     // On demande un stockage « persistant » : le navigateur évite alors
