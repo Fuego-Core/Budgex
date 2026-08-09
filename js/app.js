@@ -11,7 +11,7 @@
 const App = (() => {
   // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
   // tourne bien sur la dernière version, et pas sur un cache périmé).
-  const APP_VERSION = '20';
+  const APP_VERSION = '21';
 
   // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
@@ -222,8 +222,9 @@ const App = (() => {
     if (s.behind) s.behind.style.opacity = '';
     const threshold = Math.min(120, s.row.offsetWidth * 0.35);
     if (-s.dx > threshold) {
-      // Seuil franchi : on route vers le flux de suppression existant
-      // (confirmation pour factures/crédits, annulation pour épargne/sorties).
+      // Seuil franchi : petit retour haptique (action engageante), puis on route
+      // vers le flux existant (confirmation factures/crédits, annulation épargne/sorties).
+      if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
       const trash = s.row.querySelector('.trash[data-action]');
       if (trash) trash.click();
     }

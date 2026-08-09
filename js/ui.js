@@ -149,6 +149,7 @@ const UI = (() => {
       sheet.style.transition = ''; // rétablit la transition (ressort)
       const threshold = Math.min(160, sheet.offsetHeight * 0.28);
       if (dy > threshold) {
+        if (navigator.vibrate) { try { navigator.vibrate(10); } catch (_) {} }
         overlay.style.background = '';   // laisse le CSS gérer le fondu du fond
         sheet.style.transform = '';      // la règle de base (translateY 100%) reprend
         closeSheet();
