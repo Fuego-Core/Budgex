@@ -40,11 +40,13 @@
    * Une seule palette de mouvement pour toute l'app : cohérence garantie.
    * --ease-out  : décélération naturelle (entrées, glissements).
    * --ease-spring : léger rebond (coches, onglets, pastilles).                 */
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);   /* décélération (entrées) */
+  --ease-in: cubic-bezier(0.4, 0, 0.9, 0.5);     /* accélération (sorties) */
+  --ease-emph: cubic-bezier(0.2, 0, 0, 1);       /* « emphasized » : entrées marquées */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);/* léger rebond (coches, onglets) */
   --dur-fast: 0.16s;
-  --dur: 0.32s;
-  --dur-slow: 0.55s;
+  --dur: 0.3s;
+  --dur-slow: 0.5s;
 }
 
 /* ------------------------------------------------------------------ *
@@ -79,12 +81,12 @@ body::before {
   background:
     radial-gradient(130% 55% at 50% -12%, rgba(94, 224, 176, 0.10), transparent 62%),
     radial-gradient(90% 40% at 100% 0%, rgba(245, 185, 68, 0.05), transparent 55%);
-  /* Le halo « respire » très lentement : la page semble vivante, jamais figée. */
-  animation: ambientDrift 16s ease-in-out infinite alternate;
+  /* Le halo « respire » très lentement et discrètement : vivant, jamais tape-à-l'œil. */
+  animation: ambientDrift 26s ease-in-out infinite alternate;
 }
 @keyframes ambientDrift {
   from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(0, -12px, 0) scale(1.05); }
+  to   { transform: translate3d(0, -7px, 0) scale(1.025); }
 }
 
 h1, h2 { font-family: var(--font-title); font-weight: 600; margin: 0; }
@@ -629,10 +631,13 @@ p.empty.card { padding: 28px 16px; }
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   padding: 13px 14px;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur) ease;
 }
 .field input:focus {
   outline: none;
   border-color: var(--mint);
+  /* Halo de focus discret : repère clair sans être agressif. */
+  box-shadow: 0 0 0 3px rgba(94, 224, 176, 0.16);
 }
 /* Zone de texte (ex. collage d'une sauvegarde à importer). */
 .field textarea {
@@ -647,8 +652,13 @@ p.empty.card { padding: 28px 16px; }
   line-height: 1.4;
   resize: vertical;
   min-height: 120px;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur) ease;
 }
-.field textarea:focus { outline: none; border-color: var(--mint); }
+.field textarea:focus {
+  outline: none;
+  border-color: var(--mint);
+  box-shadow: 0 0 0 3px rgba(94, 224, 176, 0.16);
+}
 
 /* ------------------------------------------------------------------ *
  * Sélecteur segmenté (ex. choix du thème : Auto / Clair / Sombre)
@@ -855,6 +865,22 @@ p.empty.card { padding: 28px 16px; }
 /* Compteur de montants : les chiffres défilent, sans à-coup de largeur
    (chiffres tabulaires hérités de .figure). */
 .count { display: inline-block; }
+
+/* ------------------------------------------------------------------ *
+ * Transitions de vues (View Transitions API)
+ * Morph doux entre les écrans. La barre d'onglets porte son propre nom :
+ * elle est ainsi isolée du fondu et reste parfaitement fixe pendant le morph.
+ * ------------------------------------------------------------------ */
+.tabbar { view-transition-name: tabbar; }
+
+::view-transition-old(root) {
+  animation: vtOut 0.2s var(--ease-in) both;
+}
+::view-transition-new(root) {
+  animation: vtIn 0.34s var(--ease-emph) both;
+}
+@keyframes vtOut { to   { opacity: 0; transform: translateY(-6px); } }
+@keyframes vtIn  { from { opacity: 0; transform: translateY(10px); } }
 
 /* ------------------------------------------------------------------ *
  * Accessibilité — focus clavier visible

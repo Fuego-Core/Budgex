@@ -11,7 +11,7 @@
 const App = (() => {
   // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
   // tourne bien sur la dernière version, et pas sur un cache périmé).
-  const APP_VERSION = '17';
+  const APP_VERSION = '18';
 
   // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
@@ -20,29 +20,53 @@ const App = (() => {
    * Navigation
    * ------------------------------------------------------------------ */
 
-  function show(view) {
-    currentView = view;
+  // Vrai quand une transition de vue (View Transitions API) est en cours :
+  // dans ce cas on laisse la transition faire l'entrée (pas de cascade CSS).
+  let vtActive = false;
+  // Passe à true une fois l'app démarrée : on n'utilise pas les transitions de
+  // vues au tout premier affichage (le splash s'en charge).
+  let booted = false;
 
-    // Bascule des sections visibles.
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  // Applique l'état visuel de la vue (sections, onglets, sous-vue).
+  function applyViewClasses(view) {
+    currentView = view;
     document.querySelectorAll('.view').forEach((el) => {
       el.classList.toggle('active', el.id === `view-${view}`);
     });
-
-    // État actif des onglets du bas.
     document.querySelectorAll('.tab').forEach((el) => {
       const isActive = el.dataset.view === view;
       el.classList.toggle('active', isActive);
       if (isActive) el.setAttribute('aria-current', 'page');
       else el.removeAttribute('aria-current');
     });
+    document.body.classList.toggle('subview', view === 'historique' || view === 'reglages');
+  }
 
-    // Historique & Réglages masquent la barre d'onglets (vues « en pleine page »).
-    const isSub = view === 'historique' || view === 'reglages';
-    document.body.classList.toggle('subview', isSub);
-
-    // On remonte en haut et on rend AVEC la cascade d'entrée (navigation).
-    window.scrollTo(0, 0);
-    render(true);
+  function show(view) {
+    const run = () => {
+      applyViewClasses(view);
+      window.scrollTo(0, 0);
+      render(true);
+    };
+    // Transitions de vues morphées (progressive enhancement) : douceur native
+    // entre les écrans. Repli sur la cascade CSS si non supporté, et jamais au
+    // premier affichage ni en « animations réduites ».
+    if (booted && document.startViewTransition && !prefersReducedMotion()) {
+      vtActive = true;
+      try {
+        const t = document.startViewTransition(run);
+        t.finished.finally(() => { vtActive = false; });
+      } catch (e) {
+        vtActive = false;
+        run();
+      }
+    } else {
+      run();
+    }
   }
 
   /* ------------------------------------------------------------------ *
@@ -69,12 +93,14 @@ const App = (() => {
     const active = document.querySelector('.view.active');
     if (!active) return;
     if (enter) {
-      // La classe déclenche les animations CSS ; on la retire une fois finies
-      // pour qu'un rafraîchi ultérieur n'anime pas de nouveau.
-      active.classList.add('enter');
-      countUp(active);
-      clearTimeout(enterTimer);
-      enterTimer = setTimeout(() => active.classList.remove('enter'), 1400);
+      // Si une transition de vue est en cours, elle fait l'entrée : on ne double
+      // pas avec la cascade CSS ni les compteurs (les montants finaux s'affichent).
+      if (!vtActive) {
+        active.classList.add('enter');
+        countUp(active);
+        clearTimeout(enterTimer);
+        enterTimer = setTimeout(() => active.classList.remove('enter'), 1400);
+      }
     } else {
       active.classList.remove('enter');
     }
@@ -1190,6 +1216,8 @@ const App = (() => {
 
     show('accueil');
     playIntro();
+    // À partir d'ici, les navigations utilisent les transitions de vues.
+    booted = true;
   }
 
   return { init, show, refresh };
