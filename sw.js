@@ -7,7 +7,7 @@
  * continue de servir l'ancienne version depuis le cache.
  */
 
-const CACHE = 'oboli-v6';
+const CACHE = 'oboli-v7';
 
 const ASSETS = [
   './',

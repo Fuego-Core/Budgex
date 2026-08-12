@@ -169,6 +169,9 @@ const Store = (() => {
 
   function unpaidTotal() { return totalCharges() - paidTotal(); }
   function disponible() { return state.settings.income - totalCharges(); }
+  // Reste à vivre = ce qu'il reste vraiment, une fois l'épargne mise de côté et
+  // les sorties déduites : revenu − charges − épargne du mois − sorties du mois.
+  function resteAVivre() { return disponible() - savingsMonth() - outingsMonth(); }
 
   function chargesSorted() {
     const paid = currentMonth().paid;
@@ -512,7 +515,7 @@ const Store = (() => {
     load, save, rollover, seed, seedDemo, resetAll,
     monthKey, monthsBetween, daysInMonth, addMonths, currentKey, currentMonth,
     getState, CATEGORIES,
-    totalCharges, paidTotal, unpaidTotal, disponible, chargesSorted, lateCount, paidCount,
+    totalCharges, paidTotal, unpaidTotal, disponible, resteAVivre, chargesSorted, lateCount, paidCount,
     togglePaid, addCharge, updateCharge, removeCharge,
     savingsMonth, savingsTotalAll, savingsSeries, savingsStreak,
     addSaving, removeSaving, restoreSaving,

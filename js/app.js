@@ -138,9 +138,9 @@ const App = (() => {
       <section class="card dial-card">
         ${UI.dial({
           paid, unpaid, income,
-          centerLabel: 'Disponible',
-          centerValue: Store.disponible(),
-          centerSub: `sur ${UI.money(income)} de revenu`,
+          centerLabel: 'Reste à vivre',
+          centerValue: Store.resteAVivre(),
+          centerSub: `après charges, épargne et sorties`,
         })}
         <div class="legend">
           <span><i class="dot mint"></i>Payé <b>${UI.money(paid)}</b></span>
