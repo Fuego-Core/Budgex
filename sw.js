@@ -7,7 +7,7 @@
  * continue de servir l'ancienne version depuis le cache.
  */
 
-const CACHE = 'oboli-v21';
+const CACHE = 'oboli-v22';
 
 // Tous les fichiers nécessaires pour tourner sans réseau.
 // Chemins relatifs pour fonctionner aussi sous un sous-dossier (GitHub Pages).

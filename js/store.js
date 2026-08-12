@@ -216,6 +216,12 @@ const Store = (() => {
     return state.settings.income - totalCharges();
   }
 
+  // Reste à vivre = ce qu'il reste vraiment une fois l'épargne mise de côté et
+  // les sorties déduites : revenu − charges − épargne du mois − sorties du mois.
+  function resteAVivre() {
+    return disponible() - savingsMonth() - outingsMonth();
+  }
+
   // Les factures triées par jour d'échéance, enrichies de leur état.
   function chargesSorted() {
     const paid = currentMonth().paid;
@@ -547,6 +553,7 @@ const Store = (() => {
     paidTotal,
     unpaidTotal,
     disponible,
+    resteAVivre,
     chargesSorted,
     lateCount,
     togglePaid,

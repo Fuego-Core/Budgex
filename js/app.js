@@ -11,7 +11,7 @@
 const App = (() => {
   // Version de l'app, affichée dans les Réglages (utile pour vérifier qu'on
   // tourne bien sur la dernière version, et pas sur un cache périmé).
-  const APP_VERSION = '21';
+  const APP_VERSION = '22';
 
   // Vue affichée par défaut au lancement.
   let currentView = 'accueil';
@@ -386,11 +386,11 @@ const App = (() => {
         </div>
       </section>
 
-      <!-- Grand chiffre : disponible après charges fixes -->
+      <!-- Grand chiffre : reste à vivre (revenu − charges − épargne − sorties) -->
       <section class="card big-figure">
-        <p class="eyebrow">Disponible après charges fixes</p>
-        <p class="figure ${Store.disponible() < 0 ? 'neg' : ''}">${UI.countMoney(Store.disponible())}</p>
-        <p class="subtle">${UI.money(income)} de revenu − ${UI.money(Store.totalCharges())} de charges</p>
+        <p class="eyebrow">Reste à vivre</p>
+        <p class="figure ${Store.resteAVivre() < 0 ? 'neg' : ''}">${UI.countMoney(Store.resteAVivre())}</p>
+        <p class="subtle">${UI.money(income)} de revenu − ${UI.money(Store.totalCharges())} charges${saved > 0 ? ` − ${UI.money(saved)} épargne` : ''}${spent > 0 ? ` − ${UI.money(spent)} sorties` : ''}</p>
       </section>
 
       <!-- Deux cartes : épargne du mois & sorties -->
